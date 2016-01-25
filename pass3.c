@@ -1,6 +1,6 @@
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: pass3.c,v 2.20 2012-06-08 06:52:16 Gebruiker Exp $
+	$Id: pass3.c,v 2.22 2014-01-26 21:52:59 dick Exp $
 */
 
 #include	<stdio.h>
@@ -31,8 +31,8 @@ static void show_2C_line(const char [], const char []);
 static void show_1C_line(FILE *, const char *);
 static int pr_head(const struct chunk *);
 static int prs(const char *);
-static int pru(unsigned int);
-static int unslen(unsigned int);
+static int pru(size_t);
+static int unslen(size_t);
 
 static int max_line_length;		/* Actual maximum line length */
 static char *line0;			/* by Malloc() */
@@ -47,8 +47,8 @@ Show_Runs(void) {
 	fprintf(Debug_File, "Starting Show_Runs()\n");
 #endif	/* DB_RUN */
 	max_line_length = Page_Width / 2 - 2;
-	line0 = Malloc((unsigned int)((max_line_length + 1) * sizeof (char)));
-	line1 = Malloc((unsigned int)((max_line_length + 1) * sizeof (char)));
+	line0 = Malloc((size_t)(max_line_length + 1) * sizeof (char));
+	line1 = Malloc((size_t)(max_line_length + 1) * sizeof (char));
 
 	OpenIter(&iter);
 	while (GetAisoItem(&iter, &run)) {
@@ -69,17 +69,15 @@ show_run(const struct run *run) {
 	/* The animals came in two by two ... */
 	const struct chunk *cnk0 = &run->rn_chunk0;
 	const struct chunk *cnk1 = &run->rn_chunk1;
-	unsigned int nl_cnt0 =
-			cnk0->ch_last.ps_nl_cnt - cnk0->ch_first.ps_nl_cnt;
-	unsigned int nl_cnt1 =
-			cnk1->ch_last.ps_nl_cnt - cnk1->ch_first.ps_nl_cnt;
+	size_t nl_cnt0 = cnk0->ch_last.ps_nl_cnt - cnk0->ch_first.ps_nl_cnt;
+	size_t nl_cnt1 = cnk1->ch_last.ps_nl_cnt - cnk1->ch_first.ps_nl_cnt;
 	FILE *f0;
 	FILE *f1;
 
 	/* display heading of chunk */
 	if (!is_set_option('d')) {
 		/* no assumptions about the lengths of the file names! */
-		unsigned int size = run->rn_size;
+		size_t size = run->rn_size;
 		int pos = 0;
 
 		pos += pr_head(cnk0);
@@ -91,7 +89,7 @@ show_run(const struct run *run) {
 		while (pos < 2*max_line_length - unslen(size)) {
 			pos += prs(" ");
 		}
-		fprintf(Output_File, "[%u]\n", size);
+		fprintf(Output_File, "[%s]\n", size_t2string(size));
 	}
 	else {
 		(void)pr_head(cnk0);
@@ -160,17 +158,17 @@ pr_head(const struct chunk *cnk) {
 static int
 prs(const char *str) {
 	fprintf(Output_File, "%s", str);
-	return strlen(str);
+	return (int) strlen(str);
 }
 
 static int
-pru(unsigned int u) {
-	fprintf(Output_File, "%u", u);
+pru(size_t u) {
+	fprintf(Output_File, "%s", size_t2string(u));
 	return unslen(u);
 }
 
 static int
-unslen(unsigned int u) {
+unslen(size_t u) {
 	int res = 1;
 
 	while (u > 9) {
@@ -188,7 +186,7 @@ open_chunk(const struct chunk *cnk) {
 	*/
 	const char *fname = cnk->ch_text->tx_fname;
 	FILE *f = fopen(fname, "r");
-	unsigned int nl_cnt;
+	size_t nl_cnt;
 
 	if (!f) {
 		fprintf(stderr, ">>>> File %s disappeared <<<<\n", fname);
@@ -239,7 +237,7 @@ fill_line(FILE *f, char ln[]) {
 			ch = ' ';
 		}
 		if (lpos < max_line_length) {
-			ln[lpos++] = ch;
+			ln[lpos++] = (char) ch;
 		}
 		ch = getc(f);
 	}
@@ -305,10 +303,10 @@ static void
 db_chunk(const struct chunk *cnk) {
 	/*	print the tokens in the chunk, with a one-char margin
 	*/
-	unsigned int i;
+	size_t i;
 	const struct position *first = &cnk->ch_first;
 	const struct position *last = &cnk->ch_last;
-	unsigned int start = cnk->ch_text->tx_start;
+	size_t start = cnk->ch_text->tx_start;
 
 	if (first->ps_tk_cnt > 0) {
 		fprintf(Debug_File, "...");

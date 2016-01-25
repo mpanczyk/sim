@@ -1,6 +1,6 @@
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: options.h,v 1.8 2012-05-13 09:05:49 Gebruiker Exp $
+	$Id: options.h,v 1.8 2012-05-13 09:05:49 dick Exp $
 */
 
 /*	Setting and consulting command line options

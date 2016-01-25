@@ -1,6 +1,6 @@
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: pass1.c,v 2.19 2012-06-08 16:04:29 Gebruiker Exp $
+	$Id: pass1.c,v 2.27 2015-01-14 16:47:27 dick Exp $
 */
 
 #include	<stdio.h>
@@ -20,20 +20,20 @@
 static void db_print_text(const struct text *);
 #endif
 
-static void fprint_count(FILE *f, unsigned int cnt, const char *);
+static void fprint_count(FILE *f, size_t cnt, const char *);
 
 void
-Read_Input_Files(int argc, const char *argv[], int round) {
+Read_Input_Files(int argc, const char *argv[], int round /* about printing */) {
 	int n;
 
 	Init_Text(argc);
 	Init_Token_Array();
 
-	/* Assume all texts to be new */
-	Number_Of_New_Texts = Number_Of_Texts;
+	/* Initially assume all texts to be new */
+	Number_of_New_Texts = Number_of_Texts;
 
 	/* Read the files */
-	for (n = 0; n < Number_Of_Texts; n++) {
+	for (n = 0; n < Number_of_Texts; n++) {
 		const char *fname = argv[n];
 		struct text *txt = &Text[n];
 
@@ -43,16 +43,16 @@ Read_Input_Files(int argc, const char *argv[], int round) {
 
 		txt->tx_fname = fname;
 		txt->tx_pos = 0;
-		txt->tx_start =
-		txt->tx_limit = Text_Length();
-		if (strcmp(fname, "/") == 0) {
+		txt->tx_start = Token_Array_Length();
+		txt->tx_limit = Token_Array_Length();
+		if (is_new_old_separator(fname)) {
 			if (round == 1 && !is_set_option('T')) {
 				fprintf(Output_File, "separator\n");
 			}
-			Number_Of_New_Texts = n;
+			Number_of_New_Texts = n;
 		}
 		else {
-			if (!Open_Text(First, txt)) {
+			if (!Open_Text(First_Pass, txt)) {
 				if (round == 1 && !is_set_option('T')) {
 					fprintf(Output_File,
 						">>>> cannot open <<<< ");
@@ -61,19 +61,32 @@ Read_Input_Files(int argc, const char *argv[], int round) {
 					with a null file for uniformity
 				*/
 			}
-			while (Next_Text_Token_Obtained(First)) {
+			while (Next_Text_Token_Obtained()) {
 				if (!Token_EQ(lex_token, End_Of_Line)) {
 					Store_Token(lex_token);
 				}
 			}
-			Close_Text(First, txt);
-			txt->tx_limit = Text_Length();
+			Close_Text(First_Pass, txt);
+			txt->tx_limit = Token_Array_Length();
+			txt->tx_EOL_terminated =
+				Token_EQ(lex_token, End_Of_Line);
 
 			/* report */
 			if (round == 1 && !is_set_option('T')) {
 				fprint_count(Output_File,
 					     txt->tx_limit - txt->tx_start,
-					     token_name);
+					     token_name
+				);
+				fprintf(Output_File, ", ");
+				fprint_count(Output_File,
+					lex_nl_cnt - 1 +
+					     (!txt->tx_EOL_terminated ? 1 : 0),
+					"line"
+				);
+				if (!txt->tx_EOL_terminated) {
+					fprintf(Output_File,
+						" (not NL-terminated)");
+				}
 				if (lex_non_ascii_cnt) {
 					fprintf(Output_File, ", ");
 					fprint_count(Output_File,
@@ -94,18 +107,18 @@ Read_Input_Files(int argc, const char *argv[], int round) {
 	/* report total */
 	if (round == 1 && !is_set_option('T')) {
 		fprintf(Output_File, "Total: ");
-		fprint_count(Output_File, Text_Length() - 1, token_name);
+		fprint_count(Output_File, Token_Array_Length() - 1, token_name);
 		fprintf(Output_File, "\n\n");
 		fflush(Output_File);
 	}
 }
 
 static void
-fprint_count(FILE *f, unsigned int cnt, const char *unit) {
+fprint_count(FILE *f, size_t cnt, const char *unit) {
 	/*	Prints a grammatically correct string "%u %s[s]"
 		for units that form their plural by suffixing -s.
 	*/
-	fprintf(f, "%u %s%s", cnt, unit, (cnt == 1 ? "" : "s"));
+	fprintf(f, "%s %s%s", size_t2string(cnt), unit, (cnt == 1 ? "" : "s"));
 }
 
 #ifdef	DB_TEXT
@@ -113,21 +126,24 @@ fprint_count(FILE *f, unsigned int cnt, const char *unit) {
 static void
 db_print_text(const struct text *txt) {
 	/* prints a text (in compressed form) */
-	int i;
+	size_t i;
 
 	fprintf(Debug_File, "\n\n**** DB_PRINT_TEXT ****\n");
 
-	fprintf(Debug_File, "File \"%s\", %u %ss, ",
-		txt->tx_fname, txt->tx_limit - txt->tx_start, token_name
+	fprintf(Debug_File, "File \"%s\", %s %ss, ",
+		txt->tx_fname,
+		size_t2string(txt->tx_limit - txt->tx_start),
+		token_name
 	);
-	fprintf(Debug_File, "txt->tx_start = %u, txt->tx_limit = %u\n",
-		txt->tx_start, txt->tx_limit
+	fprintf(Debug_File, "txt->tx_start = %s, txt->tx_limit = %s\n",
+		size_t2string(txt->tx_start),
+		size_t2string(txt->tx_limit)
 	);
 
 	int BoL = 1;
 	for (i = txt->tx_start; i < txt->tx_limit; i++) {
 		if (BoL) {
-			fprintf(Debug_File, "[%d]:", i);
+			fprintf(Debug_File, "[%s]:", size_t2string(i));
 			BoL = 0;
 		}
 		fprintf(Debug_File, " ");

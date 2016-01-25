@@ -1,7 +1,7 @@
 %{
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: pascallang.l,v 2.18 2012-06-08 16:04:29 Gebruiker Exp $
+	$Id: pascallang.l,v 2.20 2015-01-17 10:20:40 dick Exp $
 */
 
 /*
@@ -20,9 +20,9 @@
 
 /* General language front end data */
 Token lex_token;
-unsigned int lex_nl_cnt;
-unsigned int lex_tk_cnt;
-unsigned int lex_non_ascii_cnt;
+size_t lex_nl_cnt;
+size_t lex_tk_cnt;
+size_t lex_non_ascii_cnt;
 
 /* Language-dependent data */
 
@@ -81,25 +81,11 @@ static const struct idf reserved[] = {
 
 /* Special treatment of identifiers */
 
-static void
-lower_case(char *str) {
-	/*	Turns upper case into lower case, since Pascal does not
-		distinguish between them.
-	*/
-	char *s;
-
-	for (s = str; *s; s++) {
-		if ('A' <= *s && *s <= 'Z') {
-			*s += (-'A' + 'a');
-		}
-	}
-}
-
 static Token
 idf2token(int hashing) {
 	Token tk;
 
-	lower_case(yytext);
+	lower_case(yytext);		/* Pascal is case-insensitive */
 	tk = idf_in_list(yytext, reserved, sizeof reserved, IDF);
 	if (Token_EQ(tk, IDF) && hashing) {
 		/* return a one-Token hash code */
@@ -167,8 +153,8 @@ May_Be_Start_Of_Run(Token ch) {
 	return May_Be_Start_Of_Algol_Run(ch);
 }
 
-unsigned int
-Best_Run_Size(const Token *str, unsigned int size) {
+size_t
+Best_Run_Size(const Token *str, size_t size) {
 	return Best_Algol_Run_Size(str, size);
 }
 

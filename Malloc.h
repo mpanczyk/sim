@@ -1,9 +1,12 @@
 /*	This file is part of the memory management and leak detector MALLOC.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: Malloc.h,v 1.3 2012-01-25 21:43:05 Gebruiker Exp $
+	$Id: Malloc.h,v 1.9 2014-08-23 15:15:43 Gebruiker Exp $
 */
 
-#include	<stdio.h>
+/* requires stdio.h and stdlib.h */
+
+#ifndef	_MALLOC_H_
+#define _MALLOC_H_
 
 /*****
 The files Malloc.[ch] provide several functionalities:
@@ -16,18 +19,19 @@ The files Malloc.[ch] provide several functionalities:
 The module defines several sets of routines:
 
 1.  void *Malloc(size_t s)
-    void *Calloc(int n, size_t s)
+    void *Calloc(size_t n, size_t s)
     void *Realloc(void *p, size_t s)
     void Free(void *p)
 
 2.  void *TryMalloc(size_t s)
-    void *TryCalloc(int n, size_t s)
+    void *TryCalloc(size_t n, size_t s)
     void *TryRealloc(void *p, size_t s)
 
 3.  T *new(T)
     char *new_string(const char *s)
 
 4.  void ReportMemoryLeaks(FILE *f)
+    void MemClobber(void *p, size_t size)
 
 * The members of the first set act like their Unix counterparts, except that
   they never return NULL; upon out-of-memory an error message is given on
@@ -72,23 +76,28 @@ The module defines several sets of routines:
   the time.
 *****/
 
-#define	Malloc(s)	(_leak_malloc(1, (size_t)(s), __FILE__, __LINE__))
-#define	Calloc(n,s)	(_leak_calloc(1, (n), (size_t)(s), __FILE__, __LINE__))
-#define	Realloc(p,s)	(_leak_realloc(1, (void *)(p), (size_t)(s), __FILE__, __LINE__))
-#define	TryMalloc(s)	(_leak_malloc(0, (size_t)(s), __FILE__, __LINE__))
-#define	TryCalloc(n,s)	(_leak_calloc(0, (n), (size_t)(s), __FILE__, __LINE__))
-#define	TryRealloc(p,s)	(_leak_realloc(0, (void *)(p), (size_t)(s), __FILE__, __LINE__))
+/* Private entries */
+extern void *_leak_malloc(int chk, size_t size, const char *fname, int l_nmb);
+extern void *_leak_calloc(int chk, size_t n, size_t size, const char *fname, int l_nmb);
+extern void *_leak_realloc(int chk, void *addr, size_t size, const char *fname, int l_nmb);
+extern void _leak_free(void *addr, const char *fname, int l_nmb);
+
+extern char *_new_string(const char *s, const char *fname, int l_nmb);
+
+/* Public entries */
+#define	Malloc(s)	(_leak_malloc(1, (s), __FILE__, __LINE__))
+#define	Calloc(n,s)	(_leak_calloc(1, (n), (s), __FILE__, __LINE__))
+#define	Realloc(p,s)	(_leak_realloc(1, (void *)(p), (s), __FILE__, __LINE__))
 #define	Free(p)		(_leak_free((void *)(p), __FILE__, __LINE__))
+
+#define	TryMalloc(s)	(_leak_malloc(0, (s), __FILE__, __LINE__))
+#define	TryCalloc(n,s)	(_leak_calloc(0, (n), (s), __FILE__, __LINE__))
+#define	TryRealloc(p,s)	(_leak_realloc(0, (void *)(p), (s), __FILE__, __LINE__))
 
 #define	new(type)	((type *)Malloc(sizeof (type)))
 #define	new_string(s)	(_new_string((s), __FILE__, __LINE__))
 
-extern void *_leak_malloc(int chk, size_t size, const char *fname, int l_nmb);
-extern void *_leak_calloc(int chk, int n, size_t size, const char *fname, int l_nmb);
-extern void *_leak_realloc(int chk, void *addr, size_t size, const char *fname, int l_nmb);
-extern void _leak_free(void *addr, const char *fname, int l_nmb);
-
 extern void ReportMemoryLeaks(FILE *f);
 extern void MemClobber(void *p, size_t size);
 
-extern char *_new_string(const char *s, const char *fname, int l_nmb);
+#endif	/* _MALLOC_H_ */

@@ -1,6 +1,6 @@
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: pass2.c,v 2.19 2012-06-08 16:04:29 Gebruiker Exp $
+	$Id: pass2.c,v 2.23 2015-01-12 09:16:13 dick Exp $
 */
 
 #include	<stdio.h>
@@ -13,58 +13,66 @@
 #include	"pass2.h"
 
 #ifdef	DB_POS
-static void db_print_pos_list(const char *, const struct position *);
+static void db_print_pos_list(const char *, const struct text *);
 static void db_print_lex(const char *);
 #endif
 
 static void pass2_txt(struct text *txt);
-static int next_eol_obtained(void);
 
 void
 Retrieve_Runs(void) {
 	int n;
 
-	for (n = 0; n < Number_Of_Texts; n++) {
+	for (n = 0; n < Number_of_Texts; n++) {
 		pass2_txt(&Text[n]);
 	}
 }
 
-/* instantiate sort_pos_list() */
+/* begin instantiate static void sort_pos_list(struct position **) */
 #define	SORT_STRUCT		position
 #define	SORT_NAME		sort_pos_list
 #define	SORT_BEFORE(p1,p2)	((p1)->ps_tk_cnt < (p2)->ps_tk_cnt)
 #define	SORT_NEXT		ps_next
 #include	"sortlist.bdy"
+/* end instantiate sort_pos_list() */
 
 static void
 pass2_txt(struct text *txt) {
 	struct position *pos;
-	unsigned int old_nl_cnt;
+	size_t old_nl_cnt;
 
 	if (!txt->tx_pos)	/* no need to scan the file */
 		return;
 
-	if (!Open_Text(Second, txt)) {
+	/* Open_Text() initializes lex_nl_cnt and lex_tk_cnt */
+	if (!Open_Text(Second_Pass, txt)) {
 		fprintf(stderr, ">>>> File %s disappeared <<<<\n",
 			txt->tx_fname
 		);
 		return;
 	}
-	/* Open_Text() initializes lex_nl_cnt and lex_tk_cnt */
 
+	/* Sort the positions so they can be matched to the file; the linked
+	   list of struct positions snakes through the struct positions in the
+	   struct chunks in the struct runs.
+	*/
 #ifdef	DB_POS
-	db_print_pos_list("before sorting", txt->tx_pos);
+	db_print_pos_list("before sorting", txt);
 #endif	/* DB_POS */
 
 	sort_pos_list(&txt->tx_pos);
 
 #ifdef	DB_POS
-	db_print_pos_list("after sorting", txt->tx_pos);
+	db_print_pos_list("after sorting", txt);
 #endif	/* DB_POS */
 
 #ifdef	DB_NL_BUFF
 	db_print_nl_buff(txt->tx_nl_start, txt->tx_nl_limit);
 #endif	/* DB_NL_BUFF */
+
+#ifdef	DB_POS
+	fprintf(Debug_File, "\n**** DB_PRINT_SCAN of %s ****\n", txt->tx_fname);
+#endif	/* DB_POS */
 
 	old_nl_cnt = 1;
 	pos = txt->tx_pos;
@@ -78,11 +86,16 @@ pass2_txt(struct text *txt) {
 			/* shift the administration */
 			old_nl_cnt = lex_nl_cnt;
 			/* and get the next eol position */
-			if (!next_eol_obtained()) {
-				/* ouch! not enough lines! */
-				fprintf(stderr, ">>>> File %s modified <<<<\n",
-					txt->tx_fname
-				);
+			if (!Next_Text_EOL_Obtained()) {
+				/* reached end of file without obtaining EOL */
+				if (!txt->tx_EOL_terminated) {
+					/* that's OK then */
+				} else {
+					fprintf(stderr,
+						">>>> File %s modified <<<<\n",
+						txt->tx_fname
+					);
+				}
 				break;
 			}
 #ifdef	DB_POS
@@ -104,18 +117,13 @@ pass2_txt(struct text *txt) {
 	}
 
 #ifdef	DB_POS
-	db_print_pos_list("after scanning", txt->tx_pos);
+	db_print_pos_list("after scanning", txt);
 #endif	/* DB_POS */
 
-	Close_Text(Second, txt);
-}
+	/* Flush the flex buffers; it's easier than using YY_BUFFER_STATE. */
+	while (Next_Text_EOL_Obtained());
 
-static int
-next_eol_obtained(void) {
-	while (Next_Text_Token_Obtained(Second)) {
-		if (Token_EQ(lex_token, End_Of_Line)) return 1;
-	}
-	return 0;
+	Close_Text(Second_Pass, txt);
 }
 
 #ifdef	DB_POS
@@ -128,7 +136,7 @@ db_print_pos(const struct position *pos) {
 		pos->ps_tk_cnt
 	);
 	fprintf(Debug_File, ", line # = ");
-	if (pos->ps_nl_cnt == -1) {
+	if (pos->ps_nl_cnt == (size_t) -1) {
 		fprintf(Debug_File, "<NOT SET>");
 	}
 	else {
@@ -138,9 +146,11 @@ db_print_pos(const struct position *pos) {
 }
 
 static void
-db_print_pos_list(const char *msg, const struct position *pos) {
-	fprintf(Debug_File, "\n**** DB_PRINT_POS_LIST, %s ****\n", msg);
+db_print_pos_list(const char *msg, const struct text *txt) {
+	fprintf(Debug_File, "\n**** DB_PRINT_POS_LIST of %s, %s ****\n",
+		txt->tx_fname, msg);
 
+	const struct position *pos = txt->tx_pos;
 	while (pos) {
 		db_print_pos(pos);
 		pos = pos->ps_next;
@@ -150,8 +160,11 @@ db_print_pos_list(const char *msg, const struct position *pos) {
 
 static void
 db_print_lex(const char *fn) {
-	fprintf(Debug_File, "%s: lex_tk_cnt = %u, lex_nl_cnt = %u\n",
+	fprintf(Debug_File,
+		"%s: lex_tk_cnt = %u, lex_nl_cnt = %u, lex_token = ",
 		fn, lex_tk_cnt, lex_nl_cnt);
+	fprint_token(Debug_File, lex_token);
+	fprintf(Debug_File, "\n");
 }
 
 #endif	/* DB_POS */

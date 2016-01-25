@@ -1,3 +1,64 @@
+2014-02-17  Dick Grune  <Gebruiker@GEBRUIKER-PC>
+
+	* sim.c (is_new_old_separator): MinGW sometimes (?) interprets the /
+	as a command-line argument as a reference to the MinGW tree, which
+	makes the / unusable as a separator. Even escaping it ("/") does not
+	help. Added the | as a separator.
+
+2014-01-26  Dick Grune
+
+	*  %z from Marcus Brinkmann implemented by a routine size_t2string.
+
+2014-01-26  Dick Grune
+
+	*  Sizes on my present machine (HP 6730b laptop):
+	unsigned short int: 2
+	unsigned int: 4
+	unsigned long int: 4
+	unsigned long long int: 8
+
+2013-05-31  Dick Grune
+
+	*  (hash.c) Better hash2() function.
+
+2013-04-28  Dick Grune
+
+	*  Markus Brinkmann (marcus.brinkmann@ruhr-uni-bochum.de) supplied a
+	64-bit version. %z does not work on MinGW C.
+
+2012-11-28  Dick Grune
+
+	* newargs.c (recursive_args): Liqun Chen (liqun.chen@hp.com)
+	submitted a bug report noting that the separator / is expanded under
+	the -R option. Corrected.
+
+2012-09-30  Dick Grune
+
+	* pass2.c (pass2_txt): Boyd Blackwell (Boyd.Blackwell@anu.edu.au)
+	submitted a bug report in which the line numbers (and runs
+	representations) were way off (75 lines). The input files were
+	characterized by extremely long lines, hundreds of tokens (max. 521).
+
+	After 2.5 days of debugging the cause was found: 1. since the mapping
+	from token positions to line numbers is stored as the difference of
+	the token positions from one line to the next (see text.c); 2. since
+	these differences are stored in unsigned chars to save space; 3. since
+	the nl_buff mechanism is switched off when one of these unsigned
+	characters overflow; and since 521 tokens on one line overflowed this
+	unsigned char, the nl_buff mechanism was shut off.
+
+	Since when there is no nl_buff information in pass2, pass2 resorts to
+	rereading the input file calling yylex again; 2. since the preceding
+	file had few runs to find line number to, the preceding file was not
+	read to the end, and the rest remained in flex's buffer, so a portion
+	of the preceding file seemed prefixed to the present file, adding 75
+	lines to it.
+
+	Remedy: flushing flex's buffer explicitly in pass2_txt(); this is
+	simpler than using flex's YY_BUFFER_STATE mechanism.
+
+	Advice: get rid of the nl_buff mechanism; it is no longer relevant.
+
 2012-06-09  Dick Grune
 
 	* lang.h:
@@ -628,5 +689,5 @@
 
 #	This file is part of the software similarity tester SIM.
 #	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-#	$Id: ChangeLog,v 2.19 2012-06-09 08:09:17 Gebruiker Exp $
+#	$Id: ChangeLog,v 2.25 2014-02-17 11:21:39 dick Exp $
 #

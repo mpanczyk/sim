@@ -1,6 +1,6 @@
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: algollike.c,v 2.9 2012-06-06 17:49:18 Gebruiker Exp $
+	$Id: algollike.c,v 2.10 2013-04-28 16:30:40 dick Exp $
 */
 
 #include	"options.h"
@@ -59,15 +59,15 @@ May_Be_Start_Of_Algol_Run(const Token tk) {
 }
 
 						/* Best_Run_Size */
-static unsigned int
-largest_routine(const Token *tk_array, unsigned int size) {
+static size_t
+largest_routine(const Token *tk_array, size_t size) {
 	/*	Returns the size of the longest sequence starting at
 		tk_array[0] and not containing unbalanced parentheses.
 		Does not check the nesting of the parentheses, but then,
 		sim is syntax-free anyway.
 	*/
-	unsigned int mrb_size = 0;  /* most recent balancing size */
-	unsigned int pos;
+	size_t mrb_size = 0;  	/* most recent balancing size */
+	size_t pos;
 	int i;
 	int balance_count[N_REGULAR_TOKENS];
 	/* Overkill: only a fraction of the tokens are balancers; oh well. */
@@ -114,8 +114,8 @@ largest_routine(const Token *tk_array, unsigned int size) {
 	return mrb_size;
 }
 
-unsigned int
-Best_Algol_Run_Size(const Token *tk_array, unsigned int size) {
+size_t
+Best_Algol_Run_Size(const Token *tk_array, size_t size) {
 	/*	Checks the run starting at tk_array[0] with length size for
 		acceptability in the language.  Cuts from the end if necessary
 		and returns the accepted length, which may be zero.

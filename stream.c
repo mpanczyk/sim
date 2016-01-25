@@ -1,6 +1,6 @@
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: stream.c,v 2.11 2012-06-08 16:04:29 Gebruiker Exp $
+	$Id: stream.c,v 2.13 2015-01-22 14:38:28 dick Exp $
 */
 
 #include	<stdio.h>
@@ -65,27 +65,27 @@ Print_Stream(const char *fname) {
 		return;
 	}
 
-	if (!is_set_option('T')) {
-		fprintf(Output_File,
-			" showing token stream:\nnl_cnt, tk_cnt: %ss",
-			token_name
-		);
+	fprintf(Output_File, " showing the %s stream\n", token_name);
 
-		lex_token = End_Of_Line;
-		do {
-			if (Token_EQ(lex_token, End_Of_Line)) {
-				fprintf(Output_File, "\n%u,%u:",
-					lex_nl_cnt, lex_tk_cnt
-				);
-			}
-			else {
-				fprintf(Output_File, " ");
-				fprint_token(Output_File, lex_token);
-			}
-		} while (Next_Stream_Token_Obtained());
+	lex_token = End_Of_Line;
+	do {
+		if (Token_EQ(lex_token, End_Of_Line)) {
+			fprintf(Output_File,
+				"line # = %s, %s # = %s:\n",
+				size_t2string(lex_nl_cnt),
+				token_name,
+				size_t2string(lex_tk_cnt)
+			);
+		}
+		else {
+			extern char *yytext;
+			fprintf(Output_File, " %s -> ", yytext);
+			fprint_token(Output_File, lex_token);
+			fprintf(Output_File, "\n");
+		}
+	} while (Next_Stream_Token_Obtained());
 
-		fprintf(Output_File, "\n");
-	}
+	fprintf(Output_File, "\n");
 
 	Close_Stream();
 }

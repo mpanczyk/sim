@@ -1,6 +1,6 @@
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: pass1.h,v 1.7 2012-05-16 07:56:06 Gebruiker Exp $
+	$Id: pass1.h,v 1.7 2012-05-16 07:56:06 dick Exp $
 */
 
 /*	Reads the input files; stores the tokens in Token Token_Array[]

@@ -1,6 +1,6 @@
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: compare.h,v 1.3 2012-05-16 07:56:05 Gebruiker Exp $
+	$Id: compare.h,v 1.3 2012-05-16 07:56:05 dick Exp $
 */
 
 /*	Compares each new text to the appropriate texts.

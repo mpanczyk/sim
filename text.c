@@ -1,9 +1,10 @@
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: text.c,v 1.10 2012-06-08 16:04:30 Gebruiker Exp $
+	$Id: text.c,v 1.18 2015-01-17 10:20:41 dick Exp $
 */
 
 #include	<stdio.h>
+#include	<stdlib.h>
 
 #include	"debug.par"
 #include	"sim.h"
@@ -16,36 +17,41 @@
 #include	"text.h"
 
 struct text *Text;			/* to be filled in by Malloc() */
-int Number_Of_Texts;			/* number of text files */
-int Number_Of_New_Texts;		/* number of new text files */
+int Number_of_Texts;
+int Number_of_New_Texts;
+
+typedef unsigned short nl_tk_diff_t;
 
 struct newline {
-	unsigned char nl_tk_diff;	/* token position difference */
+	nl_tk_diff_t nl_tk_diff;	/* token position difference */
 };
 
-#define	NL_INCR		1000		/* increment of newline buffer size */
+#define	NL_START	1024		/* initial newline buffer size */
 
 static struct newline *nl_buff;		/* to be filled by Malloc() */
-static unsigned int nl_size;		/* size of nl_buff[] */
-static unsigned int nl_free;		/* next free position in nl_buff[] */
+static size_t nl_size;			/* size of nl_buff[] */
+static size_t nl_free;			/* next free position in nl_buff[] */
 
-static unsigned int nl_next, nl_limit;	/* nl_buff[] pointers during pass 2 */
+static size_t nl_next, nl_limit;	/* nl_buff[] pointers during pass 2 */
 
 static void store_newline(void);
 static void init_nl_buff(void);
 
 /*							TEXT INTERFACE */
 
-static unsigned int last_tk_cnt;	/* token count at newline */
-static unsigned int last_nl_cnt;	/* nl counter during pass 2 */
+static size_t last_tk_cnt;		/* token count at newline */
+static size_t last_nl_cnt;		/* nl counter during pass 2 */
 
 void
 Init_Text(int nfiles) {
 	/* allocate the array of text descriptors */
-	if (Text) Free(Text);
-	Number_Of_Texts = nfiles;
+	if (Text) {
+		Free(Text);
+		Text = 0;
+	}
+	Number_of_Texts = nfiles;
 	Text = (struct text *)
-		Malloc((unsigned int)(Number_Of_Texts*sizeof (struct text)));
+		Malloc((size_t)(Number_of_Texts*sizeof (struct text)));
 
 	init_nl_buff();
 }
@@ -53,14 +59,14 @@ Init_Text(int nfiles) {
 int
 Open_Text(enum Pass pass, struct text *txt) {
 	switch (pass) {
-	case First:
+	case First_Pass:
 		last_tk_cnt = 0;
 		if (nl_buff) {
 			txt->tx_nl_start = nl_free;
 		}
 		break;
 
-	case Second:
+	case Second_Pass:
 		last_tk_cnt = 0;
 		if (nl_buff) {
 			nl_next = txt->tx_nl_start;
@@ -77,50 +83,41 @@ Open_Text(enum Pass pass, struct text *txt) {
 }
 
 int
-Next_Text_Token_Obtained(enum Pass pass) {
-	int ok = 0;	/* gcc does not understand enum Pass */
-
-	switch (pass) {
-	case First:
-		ok = Next_Stream_Token_Obtained();
-		if (Token_EQ(lex_token, End_Of_Line)) {
-			store_newline();
-			last_tk_cnt = lex_tk_cnt;
-		}
-		break;
-
-	case Second:
-		/* get newline info from the buffer or from the file itself */
-		if (nl_buff) {
-			if (nl_next == nl_limit) {
-				ok = 0;
-			}
-			else {
-				struct newline *nl = &nl_buff[nl_next++];
-
-				lex_nl_cnt = ++last_nl_cnt;
-				lex_tk_cnt = (last_tk_cnt += nl->nl_tk_diff);
-				lex_token = End_Of_Line;
-				ok = 1;
-			}
-		}
-		else {
-			while (	(ok = Next_Stream_Token_Obtained())
-			&&	!Token_EQ(lex_token, End_Of_Line)
-			) {
-				/* skip */
-			}
-		}
-		break;
+Next_Text_Token_Obtained(void) {
+	if (!Next_Stream_Token_Obtained()) return 0;
+	if (Token_EQ(lex_token, End_Of_Line)) {
+		store_newline();
+		last_tk_cnt = lex_tk_cnt;
 	}
+	return 1;
+}
 
-	return ok;
+int
+Next_Text_EOL_Obtained(void) {
+	/* get newline info from the buffer or from the file itself */
+	if (nl_buff) {
+		if (nl_next == nl_limit) return 0;
+
+		struct newline *nl = &nl_buff[nl_next++];
+		lex_nl_cnt = ++last_nl_cnt;
+		lex_tk_cnt = (last_tk_cnt += nl->nl_tk_diff);
+		lex_token = End_Of_Line;
+		return 1;
+	} else {
+		int ok;
+		while (	(ok = Next_Stream_Token_Obtained())
+		&&	!Token_EQ(lex_token, End_Of_Line)
+		) {
+			/* skip */
+		}
+		return ok;
+	}
 }
 
 void
 Close_Text(enum Pass pass, struct text *txt) {
 	switch (pass) {
-	case First:
+	case First_Pass:
 		if (nl_buff) {
 			if (last_tk_cnt != lex_tk_cnt) {
 				/* there were tokens after the last newline */
@@ -129,7 +126,7 @@ Close_Text(enum Pass pass, struct text *txt) {
 			txt->tx_nl_limit = nl_free;
 		}
 		break;
-	case Second:
+	case Second_Pass:
 		break;
 	}
 	Close_Stream();
@@ -151,12 +148,12 @@ Close_Text(enum Pass pass, struct text *txt) {
 	Anybody using nl_buff should therefore test for nl_buff being zero.
 */
 
-static void abandon_nl_buff(void);
+static void abandon_nl_buff(const char *);
 
 static void
 init_nl_buff(void) {
 	/* Allocate the newline buffer, if possible */
-	nl_size = 0 + NL_INCR;
+	nl_size = 0 + NL_START;
 	nl_buff = (struct newline *)TryMalloc(sizeof (struct newline)*nl_size);
 	nl_free = 0;
 }
@@ -167,15 +164,19 @@ store_newline(void) {
 
 	if (nl_free == nl_size) {
 		/* allocated array is full; try to increase its size */
-		unsigned int new_size = nl_size + NL_INCR;
+		size_t new_size = nl_size + nl_size/2;
+		if (new_size < nl_free) {
+			abandon_nl_buff("out of address space");
+			return;
+		}
+
 		struct newline *new_buff = (struct newline *)TryRealloc(
 			(char *)nl_buff,
 			sizeof (struct newline) * new_size
 		);
 
 		if (!new_buff) {
-			/* we failed */
-			abandon_nl_buff();
+			abandon_nl_buff("out of memry");
 			return;
 		}
 		nl_buff = new_buff, nl_size = new_size;
@@ -184,18 +185,21 @@ store_newline(void) {
 	/* now we are sure there is room enough */
 	{
 		struct newline *nl = &nl_buff[nl_free++];
-		unsigned int tk_diff = lex_tk_cnt - last_tk_cnt;
+		size_t tk_diff = lex_tk_cnt - last_tk_cnt;
 
-		nl->nl_tk_diff = tk_diff;
+		nl->nl_tk_diff = (nl_tk_diff_t) tk_diff;
 		if (nl->nl_tk_diff != tk_diff) {
-			/* tk_diff does not fit in nl_tk_diff */
-			abandon_nl_buff();
+			abandon_nl_buff("tk_diff does not fit in nl_tk_diff");
 		}
 	}
 }
 
-static void
-abandon_nl_buff(void) {
+static void	/*ARGSUSED*/
+abandon_nl_buff(const char *msg) {
+#undef	DB_BUFF
+#ifdef	DB_BUFF
+	fprintf(Debug_File, "abandon_nl_buff, %s\n", msg);
+#endif	/* DB_BUFF */
 	if (nl_buff) {
 		Free((char *)nl_buff);
 		nl_buff = 0;
@@ -205,8 +209,8 @@ abandon_nl_buff(void) {
 #ifdef	DB_NL_BUFF
 
 void
-db_print_nl_buff(unsigned int start, unsigned int limit) {
-	int i;
+db_print_nl_buff(size_t start, size_t limit) {
+	size_t i;
 
 	fprintf(Debug_File, "\n**** DB_NL_BUFF ****\n");
 	if (!nl_buff) {
@@ -215,19 +219,19 @@ db_print_nl_buff(unsigned int start, unsigned int limit) {
 	}
 
 	if (start > nl_free) {
-		fprintf(Debug_File, ">>>> start (%u) > nl_free (%u)\n\n",
-			start, nl_free
+		fprintf(Debug_File, ">>>> start (%s) > nl_free (%s)\n\n",
+			size_t2string(start), size_t2string(nl_free)
 		);
 		return;
 	}
 	if (limit > nl_free) {
-		fprintf(Debug_File, ">>>> limit (%u) > nl_free (%u)\n\n",
-			limit, nl_free
+		fprintf(Debug_File, ">>>> limit (%s) > nl_free (%s)\n\n",
+			size_t2string(limit), size_t2string(nl_free)
 		);
 		return;
 	}
 
-	fprintf(Debug_File, "nl_buff: %u entries:\n", nl_free);
+	fprintf(Debug_File, "nl_buff: %s entries:\n", size_t2string(nl_free));
 	for (i = start; i < limit; i++) {
 		struct newline *nl = &nl_buff[i];
 

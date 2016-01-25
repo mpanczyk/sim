@@ -1,7 +1,7 @@
 /*
 	Module:	Sort Linked Lists
-	Author:	dick@cs.vu.nl (Dick Grune @ Vrije Universiteit, Amsterdam)
-	Version:	Tue Sep 17 17:32:33 1991
+	Author:	dick@dickgrune.com (Dick Grune, Amstelveen)
+	Version: 2015-01-18
 
 Description:
 	This is the implementation part of a generic routine that sorts
@@ -15,43 +15,50 @@ Instantiation:
 static
 #endif
 void
-SORT_NAME(struct SORT_STRUCT **lh) {
-	/*	I've  never known that sorting a linked list was this
-		complicated; what am I missing?
-	*/
-	register struct SORT_STRUCT **listhook = lh;
+SORT_NAME(struct SORT_STRUCT **l_hook) {
+	/* by split-sort-merge */
+	struct SORT_STRUCT *lst = *l_hook;
+	if (lst == 0) return;			/* the empty list is sorted */
+	if (lst->SORT_NEXT == 0) return;	/* a 1-element list is sorted */
 
-	while (*listhook) {
-		/* 0. the list is not empty -> there must be a smallest one */
-		register struct SORT_STRUCT **hsmall;
+	/* There are at least two elements; split them into two sublists. */
+	struct SORT_STRUCT *q0 = 0, *q1 = 0;	/* starts of the sublists */
+	struct SORT_STRUCT **q_hook[2];		/* append hooks for the lists */
+	q_hook[0] = &q0, q_hook[1] = &q1;
+	int q_cnt = 0;				/* pertinemt sublist pointer */
 
-		/* 1. find (the pointer to) the smallest element */
-		{
-			register struct SORT_STRUCT **hook = listhook;
+	while (lst) {
+		/* Detach the head element */
+		struct SORT_STRUCT *l = lst;
+		lst = lst->SORT_NEXT;
+		l->SORT_NEXT = 0;
 
-			/* assume initially that first element is smallest */
-			hsmall = hook;
-			while (*hook) {
-				if (SORT_BEFORE(*hook, *hsmall)) {
-					/* revise opinion */
-					hsmall = hook;
-				}
-				hook = &(*hook)->SORT_NEXT;
-			}
-		}
+		/* and append it to the pertinent sublist. */
+		*q_hook[q_cnt] = l;
+		q_hook[q_cnt] = &l->SORT_NEXT;
+		q_cnt = 1 - q_cnt;		/* switch pertinent sublist */
+	}
 
-		/* 2. move the smallest element to front */
-		{
-			register struct SORT_STRUCT *smallest = *hsmall;
+	/* Sort recursively. */
+	SORT_NAME(&q0);
+	SORT_NAME(&q1);
 
-			/* remove it from the chain */
-			*hsmall = smallest->SORT_NEXT;
-			/* and insert it before the first element */
-			smallest->SORT_NEXT = *listhook;
-			*listhook = smallest;
-		}
+	/* Merge. */
+	*l_hook = 0;
+	while (q0 || q1) {
+		/* determine the list with the smallest head element */
+		struct SORT_STRUCT **h_hook = (
+			  q0 == 0 ? &q1 :
+			  q1 == 0 ? &q0 :
+			  SORT_BEFORE((q0), (q1)) ? &q0 : &q1
+		);
+		/* detach head element */
+		struct SORT_STRUCT *l = *h_hook;
+		*h_hook = (*h_hook)->SORT_NEXT;
+		l->SORT_NEXT = 0;
 
-		/* 3. skip over smallest element */
-		listhook = &(*listhook)->SORT_NEXT;
+		/* append l to l_hook */
+		*l_hook = l;
+		l_hook = &l->SORT_NEXT;
 	}
 }

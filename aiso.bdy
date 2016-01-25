@@ -1,6 +1,6 @@
 /*	This file is part of the module Arbitrary-In Sorted-Out (AISO).
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: aiso.bdy,v 1.4 2012-05-08 08:43:56 Gebruiker Exp $
+	$Id: aiso.bdy,v 1.5 2014-10-05 19:32:21 Gebruiker Exp $
 */
 
 /*
@@ -12,6 +12,7 @@ Description:
 */
 
 #include	<stdio.h>
+#include	<stdint.h>
 
 #include	"Malloc.h"
 
@@ -21,8 +22,8 @@ static struct aiso_node *list;		/* start of linked list */
 #endif	/* AISO_ITER */
 
 /* the policy */
-static int aiso_size = 0;
-static int acc_mark = 1;
+static uint64_t aiso_size = 0;
+static uint64_t acc_mark = 1;
 
 #define	add_entry()	(aiso_size++)
 #define	rem_entry()	(aiso_size--)
@@ -38,7 +39,7 @@ InsertAiso(AISO_TYPE v) {
 	struct aiso_node **prev = &list;
 #endif	/* AISO_ITER */
 
-	/*ZZ*/new_node = (struct aiso_node *)TryMalloc(sizeof (struct aiso_node));
+	new_node = (struct aiso_node *)TryMalloc(sizeof (struct aiso_node));
 	if (!new_node) {
 		/* avoid modifying the tree */
 		return 0;

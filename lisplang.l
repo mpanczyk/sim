@@ -1,7 +1,7 @@
 %{
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: lisplang.l,v 2.16 2012-06-08 16:04:29 Gebruiker Exp $
+	$Id: lisplang.l,v 2.17 2013-04-28 16:30:41 dick Exp $
 */
 
 /*
@@ -18,9 +18,9 @@
 
 /* General language front end data */
 Token lex_token;
-unsigned int lex_nl_cnt;
-unsigned int lex_tk_cnt;
-unsigned int lex_non_ascii_cnt;
+size_t lex_nl_cnt;
+size_t lex_tk_cnt;
+size_t lex_non_ascii_cnt;
 
 /* Language-dependent data */
 #include	"idf.h"
@@ -80,8 +80,8 @@ May_Be_Start_Of_Run(Token ch) {
 	return May_Be_Start_Of_Algol_Run(ch);
 }
 
-unsigned int
-Best_Run_Size(const Token *str, unsigned int size) {
+size_t
+Best_Run_Size(const Token *str, size_t size) {
 	return Best_Algol_Run_Size(str, size);
 }
 

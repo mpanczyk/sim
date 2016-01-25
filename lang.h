@@ -1,6 +1,6 @@
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: lang.h,v 1.7 2012-06-09 08:09:18 Gebruiker Exp $
+	$Id: lang.h,v 1.8 2013-04-28 16:30:41 dick Exp $
 */
 
 /*
@@ -23,6 +23,6 @@ extern int yylex(void);
 extern void yystart(void);
 
 extern Token lex_token;			/* token produced, or End_Of_Line */
-extern unsigned int lex_nl_cnt;		/* line count */
-extern unsigned int lex_tk_cnt;		/* token position */
-extern unsigned int lex_non_ascii_cnt;	/* # of non-ASCII chars found */
+extern size_t lex_nl_cnt;		/* line count */
+extern size_t lex_tk_cnt;		/* token position */
+extern size_t lex_non_ascii_cnt;	/* # of non-ASCII chars found */

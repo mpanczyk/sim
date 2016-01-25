@@ -1,6 +1,6 @@
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: add_run.h,v 1.3 2012-06-05 09:58:52 Gebruiker Exp $
+	$Id: add_run.h,v 1.4 2013-04-28 16:30:39 dick Exp $
 */
 
 /*	Interface between front-end and back-end: all information about
@@ -12,8 +12,8 @@
 
 extern void add_run(
 	struct text *txt0,		/* text of first chunk */
-	unsigned int i0,		/* chunk position in Token_Array[] */
+	size_t i0,			/* chunk position in Token_Array[] */
 	struct text *txt1,		/* text of second chunk */
-	unsigned int i1,		/* chunk position in Token_Array[] */
-	unsigned int size		/* number of tokens in the chunk */
+	size_t i1,			/* chunk position in Token_Array[] */
+	size_t size			/* number of tokens in the chunk */
 );

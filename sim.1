@@ -1,14 +1,14 @@
 .\"	This file is part of the software similarity tester SIM.
 .\"	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-.\"	$Id: sim.1,v 2.21 2012-06-05 14:58:39 Gebruiker Exp $
+.\"	$Id: sim.1,v 2.28 2015-01-28 16:46:42 dick Exp $
 .\"
-.TH SIM 1 2012/05/02
+.TH SIM 1 2015/01/23
 .SH NAME
 sim \- find similarities in C, Java, Pascal, Modula-2, Lisp, Miranda, or text files
 .SH SYNOPSIS
 .B sim_c
 [
-.B \-[defFiMnpPRsST]
+.B \-[defFiMnpPRsSTv]
 .B \-r
 .I N
 .B \-t
@@ -18,9 +18,10 @@ sim \- find similarities in C, Java, Pascal, Modula-2, Lisp, Miranda, or text fi
 .B \-o
 .I F
 ]
-file ... [
+file ... [ [
 .B /
-[ file ... ] ]
+.B |
+] file ... ]
 .br
 .B sim_c
 \&...
@@ -48,7 +49,7 @@ file ... [
 reads the C files
 .I file ...
 and looks for segments of text that are similar; two segments of program text
-are similar if they only differ in layout, comment, identifiers and
+are similar if they only differ in layout, comment, identifiers, and
 the contents of numbers, strings and characters.
 If any runs of sufficient length
 are found, they are reported on standard output; the number of significant
@@ -66,7 +67,7 @@ and
 .I sim_lisp
 for Lisp.
 .I Sim_text
-works on arbitrary text; it is occasionally useful on shell scripts.
+works on arbitrary text and it is occasionally useful on shell scripts.
 .PP
 The program can be used for finding copied pieces of code in
 purportedly unrelated programs (with
@@ -74,20 +75,33 @@ purportedly unrelated programs (with
 or
 .BR \-S ),
 or for finding accidentally duplicated code in larger projects (with
-.BR \-f ).
+.B \-f
+or
+.BR \-F ).
 .PP
-If a
+If a separator
 .B /
-is present between the input files, the latter are divided into a group of
+or
+.B |
+is present in the list of input files, the files are divided into a group of
 "new" files (before the
-.BR / )
+.BR /
+or
+.BR | )
 and a group of "old" files; if there is no
-.BR / ,
+.BR /
+or
+.BR | ,
 all files are "new".
 Old files are never compared to each other.
+See also the description of the
+.B \-s
+and
+.B \-S
+options below.
 .PP
-Since the similarity tester reads the files several times, it cannot read from
-standard input.
+Since the similarity tester needs file names to pinpoint the similarities, it
+cannot read from standard input.
 .PP
 There are the following options:
 .TP
@@ -97,43 +111,49 @@ The output is in a diff(1)-like format instead of the default
 .TP
 .B \-e
 Each file is compared to each file in isolation; this will find all
-similarities between all texts involved, regardless of duplicates.
+similarities between all texts involved, regardless of repetitive text
+(see `Calculating Percentages' below).
 .TP
 .B \-f
 Runs are restricted to segments with balancing parentheses, to isolate
-potential routine bodies (not in text).
+potential routine bodies (not in
+.IR sim_text ).
 .TP
 .B \-F
 The names of routines in calls are required to match exactly
-(not in text).
+(not in
+.IR sim_text ).
 .TP
 .B \-i
 The names of the files to be compared are read from standard input, including
-a possible
-.BR / ;
-the file names need to be separated by layout.
-This allows a very large number of file names to be specified; it differs from
-the @ facility provided by some compilers in that it handles file names only,
-and does not recognize option arguments.
+a possible separator
+.BR /
+or
+.BR | ;
+the file names must be one to a line.
+This option allows a very large number of file names to be specified;
+it differs from the \fC@\fP facility provided by some compilers in that it
+handles file names only, and does not recognize option arguments.
 .TP
 .B \-M
 Memory usage information is displayed on standard error output.
 .TP
 .B \-n
-Similarities found are only summarized, not displayed.
+Similarities found are summarized by file name, position and size, rather than
+displayed in full.
 .TP
 .B "\-o F"
 The output is written to the file named
 .IR F .
 .TP
 .B \-p
-The output is given in similarity percentages; see below; implies \fB\-e\fP
-and \fB\-s\fP.
+The output is given in similarity percentages; see `Calculating Percentages'
+below; implies \fB\-e\fP and \fB\-s\fP.
 .TP
 .B \-P
 As
 .B \-p
-but more extensive; implies \fB\-e\fP and \fB\-s\fP.
+but only the main contributor is shown; implies \fB\-e\fP and \fB\-s\fP.
 .TP
 .B "\-r N"
 The minimum run length is set to
@@ -156,7 +176,9 @@ between themselves.
 .B "\-t N"
 In combination with the
 .B \-p
-option, sets the threshold (in percents) below which similarities will not be
+or
+.B \-P
+options, sets the threshold (in percent) below which similarities will not be
 reported; the default is 1, except in
 .IR sim_text ,
 where it is 20.
@@ -164,6 +186,9 @@ where it is 20.
 .B \-T
 A more terse and uniform form of output is produced, which may be more
 suitable for postprocessing.
+.TP
+.B \-v
+Prints the version number and compilation date on standard output, then stops.
 .TP
 .B "\-w N"
 The page width used is set to
@@ -187,35 +212,180 @@ Note that this relation is not symmetric; it is in fact quite possible for one
 file to consist for 100 % of text from another file, while the other file
 consists for only 1 % of text of the first file, if their lengths differ
 enough.
-Each file is reported only once in the position of the \&\fCF\fP in the above
-line.
-This simplifies the identification of a set of files
-.IR "A[1] ... A[n]" ,
-where the concatenation of these files is also present.
-This restriction can be lifted by using the
+The
 .B \-P
-option instead.
+(capital P) option shows the main contributor for each file only.
+This simplifies the identification of a set of files \fCA[1] ... A[n]\fP,
+where the concatenation of these files is also present.
 A threshold can be set using the
 .B \-t
-option; this option is ignored under \fB\-P\fP.
-Note that the granularity of the recognized text is still governed by the
+option; note that the granularity of the recognized text is still governed by
+the
 .B \-r
 option or its default.
 .PP
+The
+.B \-r
+option controls the number of "units" that constitute a run.
+For the programs that compare programming language code, a unit is a lexical
+token in the pertinent language; comment and standard preamble material (file
+inclusion, etc.) is ignored and all strings are considered the same.
+For
+.I sim_text
+a unit is a "word" which is defined as any sequence of one or more letters,
+digits, or characters over 127 (177 octal), (to accommodate letters such as
+\(:a, \(/o, etc.).
+.br
 .I Sim_text
 accepts  s p a c e d   t e x t  as normal text.
 .PP
-The program can handle UNICODE file names under Windows.
+The
+.B \-s
+and
+.B \-S
+options control which files to compare.
+Input files are divided into two groups, new and old.
+In the absence of these control options the programs compare the files thus
+(for 4 new files and 6 old ones):
+.nf
+.ft C
+                          n e w    /     o l d       <- first file
+                        1  2  3  4 / 5  6  7  8  9 10
+                      |------------/------------
+                 n  1 | c          /
+                 e  2 | c  c       /
+                 w  3 | c  c  c    /
+                    4 | c  c  c  c /
+       second       / / /  /  /  / / /  /  /  /  /  /
+       file  ->     5 | c  c  c  c /
+                 o  6 | c  c  c  c /
+                 l  7 | c  c  c  c /
+                 d  8 | c  c  c  c /
+                    9 | c  c  c  c /
+                   10 | c  c  c  c /
+.ft P
+.fi
+where the \fCc\fPs represent file comparisons, and the \fC/\fP the
+demarcation between new and old files.
+.bp					\" KLUGDE ZZ
+Using the
+.B \-s
+option reduces this to:
+.nf
+.ft C
+                          n e w    /     o l d       <- first file
+                        1  2  3  4 / 5  6  7  8  9 10
+                      |------------/------------
+                 n  1 |            /
+                 e  2 | c          /
+                 w  3 | c  c       /
+                    4 | c  c  c    /
+       second       / / /  /  /  / / /  /  /  /  /  /
+       file  ->     5 | c  c  c  c /
+                 o  6 | c  c  c  c /
+                 l  7 | c  c  c  c /
+                 d  8 | c  c  c  c /
+                    9 | c  c  c  c /
+                   10 | c  c  c  c /
+.ft P
+.fi
+The
+.B \-S
+option reduces this further to:
+.nf
+.ft C
+                          n e w    /     o l d       <- first file
+                        1  2  3  4 / 5  6  7  8  9 10
+                      |------------/------------
+                 n  1 |            /
+                 e  2 |            /
+                 w  3 |            /
+                    4 |            /
+       second       / / /  /  /  / / /  /  /  /  /  /
+       file  ->     5 | c  c  c  c /
+                 o  6 | c  c  c  c /
+                 l  7 | c  c  c  c /
+                 d  8 | c  c  c  c /
+                    9 | c  c  c  c /
+                   10 | c  c  c  c /
+.ft P
+.fi
+.PP
+The programs can handle UNICODE file names under Windows.
 This is relevant only under the
 .B \-R
 option, since there is no way to give UNICODE file names from the command line.
+.SH LIMITATIONS
+Repetitive input is the bane of similarity checking.
+If we have a file containing 4 copies of identical text,
+.nf
+.ft C
+    A1 A2 A3 A4
+.ft P
+.fi
+where the numbers serve only to distinguish the identical copies,
+there are 8 identities: \fCA1=A2\fP, \fCA1=A3\fP, \fCA1=A4\fP, \fCA2=A3\fP, \fCA2=A4\fP, \fCA3=A4\fP, \fCA1A2=A3A4\fP,
+and \fCA1A2A3=A2A3A4\fP.
+Of these, only 3 are meaningful: \fCA1=A2\fP, \fCA2=A3\fP, and \fCA3=A4\fP.
+And for a table with 20 lines identical to each other, not unusual in a program,
+there are 715 identities, of which at most 19 are meaningful.
+Reporting all 715 of them is clearly unacceptable.
 .PP
-Care has been taken to keep all internal processes linear in the length of the
-input, with the exception of the matching process which is almost linear,
-using a hash table; various other tables are used for speed-up.
+To remedy this, finding the identities is performed as follows:
+For each position in the text, the largest segment is found, of which a
+non-overlapping copy occurs in the text following it.
+That segment and its copy are reported and scanning resumes at the position
+just after the segment.
+For the above example this results in the identities \fCA1A2=A3A4\fP and \fCA3=A4\fP,
+which is quite satisfactory, and for \fIN\fP identical segments roughly
+\fI2 log N\fP messages are given.
+.PP
+This also works out well when the four identical segments are in different
+files:
+.nf
+.ft C
+    File1: A1
+    File2: A2
+    File3: A3
+    File4: A4
+.ft P
+.fi
+Now combined segments like \fCA1A2\fP do not occur, and the algorithm finds
+the runs \fCA1=A2\fP, \fCA2=A3\fP, and \fCA3=A4\fP, for a total of \fIN-1\fP
+runs, all informative.
+.SS Calculating Percentages
+The above approach is not suitable for obtaining the percentage of a file's
+content that can be found in another file.
+This requires comparing in isolation each file pair represented by a \fCc\fP
+in the matrixes above; this is what the \fB\-e\fP option does.
+Under the \fB\-e\fP option a segment \fCFile1:A1\fP, recognized in \fCFile2\fP, will again
+be recognized in \fCFile3\fP and \fCFile4\fP.
+In the example above it produces the runs
+.nf
+.ft C
+    File1:A1=File2:A2
+    File1:A1=File3:A3
+    File1:A1=File4:A4
+    File2:A2=File3:A3
+    File2:A2=File4:A4
+    File3:A3=File4:A4
+.ft P
+.fi
+for a total of \fI\(12N(N-1)\fP runs.
+.SH TIME AND SPACE REQUIREMENTS
+Care has been taken to keep the time requirements of all internal processes
+(almost) linear in the lengths of the input files, by using various tables.
 If, however, there is not enough memory for the tables, they are discarded in
 order of unimportance, under which conditions the algorithms revert to their
 quadratic nature.
+.PP
+The time requirements are quadratic in the number of files.
+This means that, for example, one 64 MB file processes much faster than 8000 8
+kB files.
+.PP
+The program requires 6 bytes of memory for each token in the input; 2
+bytes per newline (not when doing percentages); and about 76 bytes for each
+run found.
 .SH EXAMPLES
 The call
 .nf
@@ -239,7 +409,7 @@ A call
         sim_text -e -p -s new/* / old/*
 .ft P
 .fi
-compares each file in \fCnew/*\fP to each subsequent file in \fCnew/*\fP and
+compares each file in \fCnew/*\fP to each file in \fCnew/*\fP and
 \fCold/*\fP, and if any pair has more that 20% in common, that fact is
 reported.
 Usually a similarity of 30% or more is significant; lower than 20% is probably
@@ -248,48 +418,25 @@ coincidence; and in between is doubtful.
 A call
 .nf
 .ft C
-        sim_text -e -n -s -r100 new/* / old/*
+        sim_text -e -n -s -r100 new/* "|" old/*
 .ft P
 .fi
 compares the same files, and reports large common segments.
+(The
+.B |
+can be used as a separator instead of
+.B /
+on systems where the
+.B /
+as a command-line parameter gets mangled by the command interpreter.)
+.PP
 Both approaches are good for plagiarism detection.
-.SH LIMITATIONS
-Repetitive input is the bane of similarity checking.
-If we have a file containing 4 copies of similar text,
-.nf
-    A1 A2 A3 A4
-.fi
-where the numbers serve only to distinguish the similar copies,
-there are 7 similarities: A1=A2, A1=A3, A1=A4, A2=A3, A2=A4, A3=A4, and
-A1A2=A3A4, even discarding the overlapping A1A2A3=A2A3A4.
-Of these, only 3 are meaningful: A1=A2, A2=A3, and A3=A4.
-And for a table with 20 lines similar to each other, not unusual in a program,
-there are 715 similarities, of which at most 19 are meaningful.
-Reporting all 715 of them is clearly unacceptable.
-.PP
-To remedy this, finding the similarities is performed as follows:
-For each position in the text, the largest segment is found, of which a
-non-overlapping copy occurs in the text following it.
-That segment and its copy are reported and scanning resumes at the position
-just after the segment.
-For the above example this results in the similarities A1A2=A3A4 and A3=A4,
-which is quite satisfactory, and for N similar segments roughly \fIlog N\fP
-messages are given.
-.PP
-A drawback of this heuristic is that the output is sensitive to the
-order of the input files.
-If we have two files
-.nf
-    file1 = A1, file2 = A2A3
-.fi
-then the order "file1 file2" gives "A1=A2, A2=A3" and
-"file2 file1" gives "A2=A3, A3=A1"; but both reports convey the same
-information.
 .SH BUGS
 Since it uses
 .I lex(1)
-on some systems, it may crash on any weird construction that overflows
+on some systems, it may crash on any weird construction in the input that
+overflows
 .IR lex 's
-internal buffers.
+internal buffers, for example an identifier of several thousand letters long.
 .SH AUTHOR
 Dick Grune, Vrije Universiteit, Amsterdam; dick@dickgrune.com.

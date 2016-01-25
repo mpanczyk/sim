@@ -1,6 +1,6 @@
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: idf.h,v 2.10 2012-06-08 06:52:15 Gebruiker Exp $
+	$Id: idf.h,v 2.12 2015-01-17 10:20:40 dick Exp $
 */
 
 /*	Idf module:
@@ -23,7 +23,8 @@ struct idf {
 extern Token idf_in_list(
 	const char *str,
 	const struct idf list[],
-	unsigned int listsize,
+	size_t listsize,
 	Token default_token
 );
 extern Token idf_hashed(const char *str);
+extern void lower_case(char *str);

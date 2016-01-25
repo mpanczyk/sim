@@ -1,6 +1,6 @@
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: runs.h,v 1.6 2012-05-16 07:56:06 Gebruiker Exp $
+	$Id: runs.h,v 1.7 2013-04-28 16:30:42 dick Exp $
 */
 
 /*	Although all other segments of data in this program are described by
@@ -22,7 +22,7 @@ struct chunk {
 struct run {				/* a 'run' of coincident tokens */
 	struct chunk rn_chunk0;		/* chunk in left file */
 	struct chunk rn_chunk1;		/* chunk in right file */
-	unsigned int rn_size;
+	size_t rn_size;
 };
 
 #define	AISO_TYPE	struct run *

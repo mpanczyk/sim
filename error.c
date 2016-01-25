@@ -1,6 +1,6 @@
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: error.c,v 2.6 2012-06-05 09:58:52 Gebruiker Exp $
+	$Id: error.c,v 2.7 2015-01-22 20:54:30 dick Exp $
 */
 
 #include	<stdio.h>
@@ -12,7 +12,7 @@
 void
 fatal(const char *msg) {
 #ifdef	lint
-	/* prevent non-use messages */
+	/* prevent non-use messages in lint */
 	min_run_string = 0;
 	threshold_string = 0;
 #endif

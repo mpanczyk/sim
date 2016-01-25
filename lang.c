@@ -1,6 +1,6 @@
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: lang.c,v 2.5 2012-06-08 16:04:28 Gebruiker Exp $
+	$Id: lang.c,v 2.8 2014-01-27 20:50:51 dick Exp $
 */
 
 /*
@@ -12,21 +12,37 @@
 #include	<stdlib.h>
 
 #include	"token.h"
+
+#include	"language.h"
+#include	"algollike.h"
+#include	"idf.h"
+#include	"lex.h"
 #include	"lang.h"
+
 
 FILE *yyin;
 
 int
 yylex(void) {
 	abort();
+#ifdef	lint
+	(void)May_Be_Start_Of_Algol_Run(0);
+	(void)Best_Algol_Run_Size(0, 0);
+	(void)idf_in_list(0, 0, 0, 0);
+	(void)idf_hashed(0);
+#endif
+	return 0;
 }
 
 void
 yystart(void) {
 	abort();
+#ifdef	lint
+	Init_Algol_Language(0, 0, 0, 0);
+#endif
 }
 
 Token lex_token;
-unsigned int lex_nl_cnt;
-unsigned int lex_tk_cnt;
-unsigned int lex_non_ascii_cnt;
+size_t lex_nl_cnt;
+size_t lex_tk_cnt;
+size_t lex_non_ascii_cnt;

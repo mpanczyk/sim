@@ -1,8 +1,9 @@
 #	This file is part of the software similarity tester SIM.
 #	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-#	$Id: Makefile,v 2.52 2012-06-09 08:09:17 Gebruiker Exp $
+#	$Id: Makefile,v 2.66 2015-04-29 18:18:21 dick Exp $
 #
 
+VERSION="\"2.89 of 2015-04-29\""
 
 #	E N T R Y   P O I N T S
 
@@ -11,9 +12,10 @@ help:
 	@echo  'test:           compile sim_c and run a simple test'
 	@echo  ''
 	@echo  'binaries:       create all binaries'
-	@echo  'exes:           create executables in MSDOS
+	@echo  'exes:           create executables in MSDOS'
 	@echo  'install:        install all binaries'
 	@echo  ''
+	@echo  'man:            create sim.pdf'
 	@echo  'lint:           lint sim sources'
 	@echo  'simsim:         run sim_c on the sim sources'
 	@echo  ''
@@ -27,11 +29,11 @@ help:
 #	=============== including ../lib/sysidf.mk here
 #	This file is part of the auxiliary libraries.
 #	Written by Dick Grune, dick@dickgrune.com
-#	$Id: sysidf.mk,v 1.14 2012-01-25 21:43:06 Gebruiker Exp $
+#	$Id: sysidf.mk,v 1.17 2014-07-28 09:18:13 dick Exp $
 #
 
 ################################################################
-# For UNIX|Linux
+# For UNIX-like systems
 
 SYSTEM =	UNIX
 SUBSYSTEM =	SOLARIS
@@ -51,20 +53,20 @@ ZIP =		zip -o
 ################################################################
 # For MSDOS + MinGW
 
-#SYSTEM =	MSDOS
-#SUBSYSTEM =	MinGW
+SYSTEM =	MSDOS
+SUBSYSTEM =	MinGW
 
 # Locations
-#DIR =		C:/BIN
-#BINDIR =	C:/BIN
-#MAN1DIR =	C:/BIN
+DIR =		C:/BIN
+BINDIR =	C:/BIN
+MAN1DIR =	C:/BIN
 
 # Commands (cp required, since xcopy cannot handle forward slashes)
-#COPY =		cp -p
-#EXE =		.exe
-#LEX =		flex
-#LN =		ln
-#ZIP =		zip -o
+COPY =		cp -p
+EXE =		.exe
+LEX =		flex
+LN =		ln
+ZIP =		zip -o
 
 ################################################################
 # General, compiling:
@@ -73,25 +75,31 @@ LINT =		lint -ansi -D$(SYSTEM) -D$(SUBSYSTEM)
 LINTFLAGS =	-xh
 
 # General, manual:
+GROFF =		groff -man
+GROFF =		man2pdf
+
 .SUFFIXES:	.1 .3 .pdf
 
 .1.pdf:
-		man2pdf $<
+		$(GROFF) $<
 
 .3.pdf:
-		man2pdf $<
+		$(GROFF) $<
 #	=============== end of ../lib/sysidf.mk
 
-# Compiler Options
+# Compiling
 MEMORY =	-DMEMLEAK -DMEMCLOBBER
-CFLAGS =	$(MEMORY) -O4
+CFLAGS =	-DVERSION=$(VERSION) $(MEMORY) -O4
 LIBFLAGS =	#
 LINTFLAGS =	$(MEMORY) -h# -X
+LOADFLAGS =	-s#			# strip symbol table
+LOADER =	$(CC) $(LOADFLAGS)
 
 # Debugging
 CFLAGS +=	-DDEBUG
 DEBUG_C =	debug.c
 DEBUG_O =	debug.o
+DEBUG_H =	debug.h
 
 #	T E S T   P A R A M E T E R S
 
@@ -99,11 +107,6 @@ DEBUG_O =	debug.o
 TEST_LANG =	c
 TEST_OPT =	-p
 TEST_INP =	*.l
-
-# -i option test
-TEST_LANG =	c
-TEST_OPT =	-f -r 20 -i <option-i.inp
-TEST_INP =	#
 
 # text test
 TEST_LANG =	text
@@ -124,6 +127,11 @@ TEST_INP =	Kuhl/simc1.c Kuhl/simc2.c
 TEST_LANG =	c
 TEST_OPT =	-p
 TEST_INP =	Kuhl/simc2.c Kuhl/simc1.c
+
+# -i option test
+TEST_LANG =	c
+TEST_OPT =	-f -r 20 -R -i <option-i.inp
+TEST_INP =	#
 
 # regular test
 TEST_LANG =	c
@@ -151,7 +159,7 @@ test:		sim.res stream.res percentages.res	# three simple tests
 #	B I N A R I E S
 
 BINARIES =	sim_c$(EXE) sim_java$(EXE) sim_pasc$(EXE) sim_m2$(EXE) \
-	 	sim_lisp$(EXE) sim_mira$(EXE) sim_text$(EXE)
+		sim_lisp$(EXE) sim_mira$(EXE) sim_text$(EXE)
 
 binaries:	$(BINARIES)
 
@@ -164,15 +172,17 @@ exes:		$(EXES)
 
 # Common modules:
 COM_CFS =	token.c lex.c stream.c text.c tokenarray.c error.c $(DEBUG_C) \
-		ForEachFile.c fname.c Malloc.c
-ABS_CFS =	lang.c language.c# C files for the abstract modules
+		ForEachFile.c fname.c Malloc.c any_int.c
 COM_OBJ =	token.o lex.o stream.o text.o tokenarray.o error.o $(DEBUG_O) \
-		ForEachFile.o fname.o Malloc.o
-COM_SRC =	token.h lex.h stream.h text.h tokenarray.h error.h \
-		ForEachFile.h fname.h Malloc.h \
+		ForEachFile.o fname.o Malloc.o any_int.o
+COM_SRC =	token.h lex.h stream.h text.h tokenarray.h error.h $(DEBUG_H) \
+		ForEachFile.h fname.h Malloc.h any_int.h \
 		lang.h language.h \
 		sortlist.spc sortlist.bdy system.par $(COM_CFS)
 COM_FLS =	$(COM_SRC)
+
+# C files for the abstract modules:
+ABS_CFS =	lang.c language.c
 
 # The idf module:
 IDF_CFS =	idf.c
@@ -211,7 +221,7 @@ ALG_OBJ =	algollike.o
 ALG_SRC =	algollike.h $(ALG_CFS)
 ALG_FLS =	$(ALG_SRC)
 
-# The C Language module:					C
+# The C Language module:					# C
 CLANG_CFS =	clang.c
 CLANG_OBJ =	clang.o
 CLANG_SRC =	clang.l
@@ -224,14 +234,14 @@ SIM_C_CFS =	$(SIM_CFS) $(ALG_CFS) $(CLANG_CFS)
 SIM_C_OBJ =	$(SIM_OBJ) $(ALG_OBJ) $(CLANG_OBJ)
 
 sim_c$(EXE):	$(SIM_C_OBJ)
-		$(CC) $(SIM_C_OBJ) -o $@
+		$(LOADER) $(SIM_C_OBJ) -o $@
 
 SIM_GRB +=	clang.c sim_c
 
 $(BINDIR)/sim_c$(EXE):	sim_c$(EXE)
 		$(COPY) sim_c$(EXE) $@
 
-# The Java Language module:					Java
+# The Java Language module:					# Java
 JAVALANG_CFS =	javalang.c
 JAVALANG_OBJ =	javalang.o
 JAVALANG_SRC =	javalang.l
@@ -244,14 +254,14 @@ SIM_JAVA_CFS =	$(SIM_CFS) $(ALG_CFS) $(JAVALANG_CFS)
 SIM_JAVA_OBJ =	$(SIM_OBJ) $(ALG_OBJ) $(JAVALANG_OBJ)
 
 sim_java$(EXE):	$(SIM_JAVA_OBJ)
-		$(CC) $(SIM_JAVA_OBJ) -o $@
+		$(LOADER) $(SIM_JAVA_OBJ) -o $@
 
 SIM_GRB +=	javalang.c sim_java
 
 $(BINDIR)/sim_java$(EXE):	sim_java$(EXE)
 		$(COPY) sim_java$(EXE) $@
 
-# The Pascal Language module:					Pascal
+# The Pascal Language module:					# Pascal
 PASCLANG_CFS =	pascallang.c
 PASCLANG_OBJ =	pascallang.o
 PASCLANG_SRC =	pascallang.l
@@ -264,14 +274,14 @@ SIM_PASC_CFS =	$(SIM_CFS) $(ALG_CFS) $(PASCLANG_CFS)
 SIM_PASC_OBJ =	$(SIM_OBJ) $(ALG_OBJ) $(PASCLANG_OBJ)
 
 sim_pasc$(EXE):	$(SIM_PASC_OBJ)
-		$(CC) $(SIM_PASC_OBJ) -o $@
+		$(LOADER) $(SIM_PASC_OBJ) -o $@
 
 SIM_GRB +=	pascallang.c sim_pasc
 
 $(BINDIR)/sim_pasc$(EXE):	sim_pasc$(EXE)
 		$(COPY) sim_pasc$(EXE) $@
 
-# The Modula-2 Language module:					Modula-2
+# The Modula-2 Language module:					# Modula-2
 M2LANG_CFS =	m2lang.c
 M2LANG_OBJ =	m2lang.o
 M2LANG_SRC =	m2lang.l
@@ -284,14 +294,14 @@ SIM_M2_CFS =	$(SIM_CFS) $(ALG_CFS) $(M2LANG_CFS)
 SIM_M2_OBJ =	$(SIM_OBJ) $(ALG_OBJ) $(M2LANG_OBJ)
 
 sim_m2$(EXE):	$(SIM_M2_OBJ)
-		$(CC) $(SIM_M2_OBJ) -o $@
+		$(LOADER) $(SIM_M2_OBJ) -o $@
 
 SIM_GRB +=	m2lang.c sim_m2
 
 $(BINDIR)/sim_m2$(EXE):	sim_m2$(EXE)
 		$(COPY) sim_m2$(EXE) $@
 
-# The Lisp Language module:					Lisp
+# The Lisp Language module:					# Lisp
 LISPLANG_CFS =	lisplang.c
 LISPLANG_OBJ =	lisplang.o
 LISPLANG_SRC =	lisplang.l
@@ -304,14 +314,14 @@ SIM_LISP_CFS =	$(SIM_CFS) $(ALG_CFS) $(LISPLANG_CFS)
 SIM_LISP_OBJ =	$(SIM_OBJ) $(ALG_OBJ) $(LISPLANG_OBJ)
 
 sim_lisp$(EXE):	$(SIM_LISP_OBJ)
-		$(CC) $(SIM_LISP_OBJ) -o $@
+		$(LOADER) $(SIM_LISP_OBJ) -o $@
 
 SIM_GRB +=	lisplang.c sim_lisp
 
 $(BINDIR)/sim_lisp$(EXE):	sim_lisp$(EXE)
 		$(COPY) sim_lisp$(EXE) $@
 
-# The Miranda Language module:					Miranda
+# The Miranda Language module:					# Miranda
 MIRALANG_CFS =	miralang.c
 MIRALANG_OBJ =	miralang.o
 MIRALANG_SRC =	miralang.l
@@ -324,14 +334,14 @@ SIM_MIRA_CFS =	$(SIM_CFS) $(ALG_CFS) $(MIRALANG_CFS)
 SIM_MIRA_OBJ =	$(SIM_OBJ) $(ALG_OBJ) $(MIRALANG_OBJ)
 
 sim_mira$(EXE):	$(SIM_MIRA_OBJ)
-		$(CC) $(SIM_MIRA_OBJ) -o $@
+		$(LOADER) $(SIM_MIRA_OBJ) -o $@
 
 SIM_GRB +=	miralang.c sim_mira
 
 $(BINDIR)/sim_mira$(EXE):	sim_mira$(EXE)
 		$(COPY) sim_mira$(EXE) $@
 
-# The Text module:						Text
+# The Text module:						# Text
 TEXTLANG_CFS =	textlang.c
 TEXTLANG_OBJ =	textlang.o
 TEXTLANG_SRC =	textlang.l
@@ -344,7 +354,7 @@ SIM_TEXT_CFS =	$(SIM_CFS) $(TEXTLANG_CFS)
 SIM_TEXT_OBJ =	$(SIM_OBJ) $(TEXTLANG_OBJ)
 
 sim_text$(EXE):	$(SIM_TEXT_OBJ)
-		$(CC) $(SIM_TEXT_OBJ) -o $@
+		$(LOADER) $(SIM_TEXT_OBJ) -o $@
 
 SIM_GRB +=	textlang.c sim_text
 
@@ -363,18 +373,22 @@ $(BINDIR)/sim_text$(EXE):	sim_text$(EXE)
 
 
 
+
+
 #	T E S T S
 
 # Some simple tests:
-sim.res:	sim_$(TEST_LANG)$(EXE) $(TEST_INP)
+.PHONY:		sim.res percentages.res
+
+sim.res:	sim_$(TEST_LANG)$(EXE)	# no TEST_INP required, for error tests
 		./sim_$(TEST_LANG)$(EXE) $(TEST_OPT) $(TEST_INP)
 
-stream.res:	sim_$(TEST_LANG)$(EXE) $(TEST_INP)
-		./sim_$(TEST_LANG)$(EXE) -- $(TEST_INP) >$@
+stream.res:	sim_$(TEST_LANG)$(EXE)
+		./sim_$(TEST_LANG)$(EXE) -- $(TEST_OPT) $(TEST_INP) >$@
 		wc $@ $(TEST_INP)
 
-percentages.res:sim_$(TEST_LANG)$(EXE) $(TEST_INP)
-		./sim_$(TEST_LANG)$(EXE) -p $(TEST_INP) $(TEST_INP)
+percentages.res:sim_$(TEST_LANG)$(EXE)
+		./sim_$(TEST_LANG)$(EXE) -p $(TEST_OPT) $(TEST_INP)
 
 TEST_GRB =	stream.res
 
@@ -405,6 +419,10 @@ FLS =		$(SIM_FLS) $(ALG_FLS) \
 		sysidf.mk sysidf.msdos sysidf.unix
 DOC =		README sim.1 sim.txt sim.html ChangeLog Answers TechnReport
 
+# Documentation
+
+man:		sim.pdf
+
 # Installation
 install_all:	install			# just a synonym
 install:	$(MAN1DIR)/sim.1 \
@@ -421,11 +439,13 @@ $(MAN1DIR)/sim.1:	sim.1
 
 
 # Clean-up
+
 .PHONY:		clean fresh
 clean:
 		-rm -f *.o
 		-rm -f $(SIM_GRB)
 		-rm -f $(TEST_GRB)
+		-rm -f $(DOC_GRB)
 		-rm -f a.out a.exe sim.txt core mon.out
 
 fresh:		clean
@@ -435,47 +455,52 @@ fresh:		clean
 
 # DO NOT DELETE THIS LINE -- make depend depends on it.
 ForEachFile.o: ForEachFile.c ForEachFile.h fname.h
-Malloc.o: Malloc.c Malloc.h
+Malloc.o: Malloc.c any_int.h Malloc.h
 add_run.o: add_run.c sim.h debug.par text.h runs.h aiso.spc percentages.h \
  Malloc.h options.h error.h add_run.h
-algollike.o: algollike.c options.h error.h token.h algollike.h language.h
-clang.o: clang.c options.h algollike.h token.h language.h idf.h lex.h \
+algollike.o: algollike.c options.h error.h token.h algollike.h
+any_int.o: any_int.c any_int.h
+clang.o: clang.c options.h token.h language.h algollike.h idf.h lex.h \
  lang.h
-compare.o: compare.c sim.h text.h tokenarray.h token.h hash.h language.h \
+compare.o: compare.c sim.h text.h token.h tokenarray.h hash.h language.h \
  options.h add_run.h compare.h debug.par
 count_sim_dup.o: count_sim_dup.c
 debug.o: debug.c debug.h
 error.o: error.c sim.h error.h
 fname.o: fname.c fname.h
 hash.o: hash.c system.par debug.par sim.h text.h Malloc.h error.h \
- language.h token.h tokenarray.h options.h hash.h
+ any_int.h token.h language.h tokenarray.h options.h hash.h
 idf.o: idf.c system.par token.h idf.h
-javalang.o: javalang.c options.h algollike.h token.h language.h idf.h \
+javalang.o: javalang.c options.h token.h language.h algollike.h idf.h \
  lex.h lang.h
-lex.o: lex.c token.h lex.h
-lisplang.o: lisplang.c algollike.h token.h language.h lex.h lang.h idf.h
-m2lang.o: m2lang.c options.h algollike.h token.h language.h idf.h lex.h \
+lang.o: lang.c token.h language.h algollike.h idf.h lex.h lang.h
+language.o: language.c token.h language.h
+lex.o: lex.c lex.h
+lisplang.o: lisplang.c token.h language.h algollike.h lex.h lang.h idf.h
+m2lang.o: m2lang.c options.h token.h language.h algollike.h idf.h lex.h \
  lang.h
-miralang.o: miralang.c algollike.h token.h language.h lex.h lang.h idf.h
-newargs.o: newargs.c ForEachFile.h fname.h Malloc.h error.h newargs.h
+miralang.o: miralang.c token.h language.h algollike.h lex.h lang.h idf.h
+newargs.o: newargs.c sim.h ForEachFile.h fname.h Malloc.h error.h \
+ newargs.h
 options.o: options.c options.h
-pascallang.o: pascallang.c options.h algollike.h token.h language.h idf.h \
+pascallang.o: pascallang.c options.h token.h language.h algollike.h idf.h \
  lex.h lang.h
-pass1.o: pass1.c debug.par sim.h text.h tokenarray.h token.h lex.h \
+pass1.o: pass1.c debug.par sim.h text.h token.h tokenarray.h lang.h \
  error.h options.h pass1.h
-pass2.o: pass2.c debug.par sim.h text.h lex.h token.h pass2.h \
+pass2.o: pass2.c debug.par sim.h token.h text.h lang.h pass2.h \
  sortlist.bdy
-pass3.o: pass3.c system.par debug.par sim.h text.h runs.h aiso.spc \
- Malloc.h error.h options.h pass3.h percentages.h
-percentages.o: percentages.c sim.h text.h runs.h aiso.spc options.h \
- Malloc.h error.h percentages.h sortlist.bdy
+pass3.o: pass3.c system.par debug.par sim.h text.h token.h runs.h \
+ aiso.spc Malloc.h error.h options.h pass3.h percentages.h
+percentages.o: percentages.c debug.par sim.h text.h runs.h aiso.spc \
+ options.h Malloc.h error.h percentages.h sortlist.bdy
 runs.o: runs.c sim.h text.h runs.h aiso.spc debug.par aiso.bdy Malloc.h
-sim.o: sim.c system.par settings.par sim.h options.h newargs.h language.h \
- token.h error.h text.h runs.h aiso.spc hash.h compare.h pass1.h pass2.h \
- pass3.h percentages.h stream.h lex.h Malloc.h
-stream.o: stream.c system.par token.h lex.h lang.h stream.h
-text.o: text.c debug.par sim.h token.h stream.h lex.h Malloc.h options.h \
+sim.o: sim.c system.par settings.par sim.h options.h newargs.h token.h \
+ language.h error.h text.h runs.h aiso.spc hash.h compare.h pass1.h \
+ pass2.h pass3.h percentages.h stream.h lang.h Malloc.h any_int.h
+stream.o: stream.c system.par sim.h options.h token.h lang.h stream.h
+t.o: t.c
+text.o: text.c debug.par sim.h token.h stream.h lang.h Malloc.h options.h \
  error.h text.h
-textlang.o: textlang.c sim.h language.h token.h idf.h lex.h lang.h
+textlang.o: textlang.c sim.h token.h idf.h lex.h lang.h language.h
 token.o: token.c token.h
-tokenarray.o: tokenarray.c error.h lex.h token.h Malloc.h tokenarray.h
+tokenarray.o: tokenarray.c error.h Malloc.h token.h lang.h tokenarray.h

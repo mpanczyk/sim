@@ -1,6 +1,6 @@
 /*	This file is part of the debugging module DEBUG.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: debug.c,v 1.5 2012-01-25 21:43:05 Gebruiker Exp $
+	$Id: debug.c,v 1.7 2014-09-25 06:58:25 Gebruiker Exp $
 */
 
 #include	<stdlib.h>
@@ -8,6 +8,19 @@
 #include	<ctype.h>
 
 #include	"debug.h"
+
+/*Library module source prelude */
+#undef	_MODULE_CODE_
+#ifndef	lint
+#define	_MODULE_CODE_
+#endif
+#ifdef	LIB
+#define	_MODULE_CODE_
+#endif
+
+#ifdef	_MODULE_CODE_
+
+/* Library module source code */
 
 #ifdef		DEBUG
 
@@ -32,7 +45,7 @@ wr_str(const char *s) {
 }
 
 void
-wr_info(const char *s, int b, int v) {
+wr_info(const char *s, int v) {
 	/* print the string */
 	if (s) {
 		int cnt = 0;
@@ -71,29 +84,12 @@ wr_info(const char *s, int b, int v) {
 	}
 
 	/* print the value */
-	if (b != 0) {
-		wr_char(' ');
-		if (v < 0) {
-			wr_char('-');
-			v = -v;
-		}
-		switch (b) {
-		case 8:
-			wr_char('0');
-			wr_num(b, v);
-			break;
-		default:
-			wr_num(10, v);
-			break;
-		case 16:
-			wr_char('#');
-			wr_num(b, v);
-			break;
-		case 128:
-			wr_char(v);
-			break;
-		}
+	wr_char(' ');
+	if (v < 0) {
+		wr_char('-');
+		v = -v;
 	}
+	wr_num(10, v);
 
 	wr_char('\n');
 }
@@ -102,7 +98,18 @@ wr_info(const char *s, int b, int v) {
 
 /*ARGSUSED*/
 void
-wr_info(const char *s, int b, int v) {
+wr_info(const char *s, int v) {
 }
 
-#endif
+#endif	/* DEBUG */
+
+/* End library module source code */
+#endif	/* _MODULE_CODE_ */
+
+#ifdef	lint
+static void
+satisfy_lint(void *x) {
+	wr_info((char *)x, 0);
+	satisfy_lint(x);
+}
+#endif	/* lint */

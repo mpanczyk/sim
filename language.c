@@ -1,6 +1,6 @@
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: language.c,v 2.2 2012-06-08 16:04:28 Gebruiker Exp $
+	$Id: language.c,v 2.3 2013-04-28 16:30:41 dick Exp $
 */
 
 /*
@@ -25,8 +25,8 @@ May_Be_Start_Of_Run(Token ch) {
 	return 0;
 }
 
-unsigned int
-Best_Run_Size(const Token *str, unsigned int size) {
+size_t
+Best_Run_Size(const Token *str, size_t size) {
 	if (str == str || size == size) abort();
 	return 0;
 }

@@ -1,15 +1,17 @@
 /*	This file is part of the auxiliaries library.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: fname.c,v 1.5 2012-05-04 10:56:47 Gebruiker Exp $
+	$Id: fname.c,v 1.7 2014-07-28 09:18:12 Gebruiker Exp $
 */
 
 /*	Support for UNICODE file names in Windows */
 
 /*	Two data types are involved in UNICODE file names in Windows:
-	UTF16 strings, the file names as stored by Windows, and
-	UTF8 strings, the names as they are displayed and stored.
+
+		UTF16 strings, the file names as stored by Windows, and
+		UTF8 strings, the names as they are displayed and stored.
+
 	The conversion between these two proceeds through CodePoints,
-	the 'real' vales of the characters, of which UTF16 strings and
+	the 'real' values of the characters, of which UTF16 strings and
 	UTF8 strings are the compressed representations.
 
 	The module consists of two levels: a set of static routines
@@ -31,6 +33,19 @@
 */
 
 #include	"fname.h"
+
+/*Library module source prelude */
+#undef	_FNAME_CODE_
+#ifndef	lint
+#define	_FNAME_CODE_
+#endif
+#ifdef	LIB
+#define	_FNAME_CODE_
+#endif
+
+#ifdef	_FNAME_CODE_
+
+/* Library module source code */
 
 #ifdef	_UNICODE
 typedef uint8_t UTF8;
@@ -308,3 +323,14 @@ Fopen(const Fchar *fn, const char *rb) {	/* stream is still char* */
 }
 
 #endif	/* _UNICODE */
+
+/* End library module source code */
+#endif	/* _FNAME_CODE_ */
+
+#ifdef	lint
+static void
+satisfy_lint(void *x) {
+	/* lint cannot handle Fchar complications */
+	satisfy_lint(x);
+}
+#endif	/* lint */

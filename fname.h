@@ -1,6 +1,6 @@
 /*	This file is part of the auxiliaries library.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: fname.h,v 1.7 2012-05-04 10:56:47 Gebruiker Exp $
+	$Id: fname.h,v 1.12 2014-07-28 09:18:12 Gebruiker Exp $
 */
 
 /*	Support for UNICODE file names */
@@ -21,7 +21,7 @@
 
       Fchar *Fnamecpy(Fchar *dest, Fchar *source);
       Fchar *Fnamecat(Fchar*, const Fchar*);
-      size_t Fnamelen(const Fchar*);
+      int Fnamelen(const Fchar*);
       int Fnamecmp(const Fchar*, const Fchar*);
 
       int Stat(const Fchar *fn, struct stat *st);
@@ -39,7 +39,9 @@
        DIR by Dir_t, and
        struct dirent by Dirent_t.
    Compiling and correcting using the above replacements until there are no
-   more errors or warnings will then yield an UTF-16 compatible program.
+   more errors or warnings will then yield an UTF-16 compatible program, as
+   far as the input is concerned. Output is done in UTF-8; there seems to be
+   no way to do output in UFT-16.
 
    For details about UTF-16 see fname.c.
 */
@@ -48,7 +50,7 @@
 #define _FNAME_H_
 
 /* lint cannot handle the weird code Windows throws at it, so even under
-   Windows we clain to hve UTF8
+   Windows we claim to have UTF8
 */
 #ifdef	MSDOS
 #define	IS_UTF_16
@@ -66,17 +68,19 @@
 #include	<sys/stat.h>
 #include	<dirent.h>
 
+/* Private entries */
 typedef _TCHAR Fchar;
 typedef _WDIR Dir_t;
 typedef struct _tdirent Dirent_t;
 
+/* Public entries */
 #define	Opendir		_topendir
 #define	Closedir	_tclosedir
 #define	Readdir		_treaddir
 
 #define	Fnamecpy	wcscpy
 #define	Fnamecat	wcscat
-#define	Fnamelen	wcslen
+#define	Fnamelen	(int)wcslen
 #define	Fnamecmp	wcscmp
 
 extern const char *Fname2str(const Fchar *fn);		/* transient! */
@@ -90,8 +94,10 @@ extern FILE *Fopen(const Fchar *fn, const char *rb);/* stream is still char* */
 
 #include	<sys/stat.h>
 #include	<dirent.h>
+#include	<string.h>
 
 /* life is simple */
+/* Public entries */
 typedef char Fchar;
 
 #define	Fnamecpy	strcpy

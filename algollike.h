@@ -1,13 +1,13 @@
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: algollike.h,v 1.6 2012-06-08 06:52:14 Gebruiker Exp $
+	$Id: algollike.h,v 1.7 2013-04-28 16:30:40 dick Exp $
 */
 
 /*	The class Algollike is a subclass of Language.  It implements
 	the routines
 	    void Init_Algol_Language()
 	    int May_Be_Start_Of_Algol_Run() and
-	    unsigned int Best_Algol_Run_Size()
+	    size_t Best_Algol_Run_Size()
 	for ALGOL-like languages, languages in which it is meaningful and
 	useful to isolate function bodies. These routines can be used in
 	Init_Language(), May_Be_Start_Of_Run(), and Best_Run_Size(), required
@@ -29,4 +29,4 @@ extern void Init_Algol_Language(
     const Token Openers[], const Token Closers[]
 ); /* note the order of the arguments: Non_Finals ~ Openers, etc. */
 extern int May_Be_Start_Of_Algol_Run(Token ch);
-extern unsigned int Best_Algol_Run_Size(const Token *str, unsigned int size);
+extern size_t Best_Algol_Run_Size(const Token *str, size_t size);

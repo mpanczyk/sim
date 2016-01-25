@@ -1,6 +1,6 @@
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: language.h,v 1.7 2012-06-09 08:09:18 Gebruiker Exp $
+	$Id: language.h,v 1.8 2013-04-28 16:30:41 dick Exp $
 */
 
 /*
@@ -22,4 +22,4 @@
 
 extern void Init_Language(void);
 extern int May_Be_Start_Of_Run(Token ch);
-extern unsigned int Best_Run_Size(const Token *str, unsigned int size);
+extern size_t Best_Run_Size(const Token *str, size_t size);

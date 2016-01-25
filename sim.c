@@ -1,6 +1,6 @@
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: sim.c,v 2.31 2012-06-08 16:04:29 Gebruiker Exp $
+	$Id: sim.c,v 2.45 2015-04-29 18:18:22 dick Exp $
 */
 
 #include	<stdio.h>
@@ -25,10 +25,18 @@
 #include	"percentages.h"
 #include	"stream.h"
 #include	"lang.h"
-#include	"Malloc.h"
 
+#include	"Malloc.h"
+#include	"any_int.h"
+
+							/* VERSION */
+#if	0	/* set to 1 when experimenting */
+#undef	VERSION
+#define	VERSION	__TIMESTAMP__
+#endif
+							/* PARAMETERS */
 /* command-line parameters */
-unsigned int Min_Run_Size = DEFAULT_MIN_RUN_SIZE;
+int Min_Run_Size = DEFAULT_MIN_RUN_SIZE;
 int Page_Width = DEFAULT_PAGE_WIDTH;
 int Threshold_Percentage = 1;		/* minimum percentage to show */
 FILE *Output_File;
@@ -54,7 +62,7 @@ static const struct option optlist[] = {
 	{'T', "terse output", ' ', 0},
 	{'n', "display headings only", ' ', 0},
 	{'p', "use percentage format for output", ' ', 0},
-	{'P', "use percentage format, showing all combinations", ' ', 0},
+	{'P', "use percentage format, main contributor only", ' ', 0},
 	{'t', "threshold level of percentage to show", 'N', &threshold_string},
 	{'e', "compare each file to each file separately", ' ', 0},
 	{'s', "do not compare a file to itself", ' ', 0},
@@ -62,11 +70,44 @@ static const struct option optlist[] = {
 	{'R', "recurse into subdirectories", ' ', 0},
 	{'i', "read arguments (file names) from standard input", ' ', 0},
 	{'o', "write output to file F", 'F', &output_name},
+	{'v', "show version number and compilation date", ' ', 0},
 	{'M', "show memory usage info", ' ', 0},
 	{'-', "lexical scan output only", ' ', 0},
 	{0, 0, 0, 0}
 };
 
+static void
+allow_at_most_one_out_of(const char *opts) {
+	const char *first;
+	for (first = opts; *first; first++) {
+		const char *second;
+		for (second = first + 1; *second; second++) {
+			if (is_set_option(*first) &&is_set_option(*second)) {
+				char msg[256];
+				sprintf(msg,
+					"options -%c and -%c are incompatible",
+					*first, *second
+				);
+				fatal(msg);
+			}
+		}
+	}
+}
+
+							/* SERVICE ROUTINES */
+int
+is_new_old_separator(const char *s) {
+	if (strcmp(s, "/") == 0) return 1;
+	if (strcmp(s, "|") == 0) return 1;
+	return 0;
+}
+
+const char *
+size_t2string(size_t s) {
+	return any_uint2string(s, 0);
+}
+
+							/* PROGRAM */
 static void
 read_and_compare_files(int argc, const char **argv, int round) {
 	Read_Input_Files(argc, argv, round);
@@ -75,30 +116,18 @@ read_and_compare_files(int argc, const char **argv, int round) {
 	Free_Forward_References();
 }
 
-static int
-is_new_old_separator(const char *s) {
-	return strcmp(s, "/") == 0;
-}
-
+#ifdef	ARG_TEST
 static void
-reverse_new_input_files(int argc, const char *argv[]) {
-	int txt_first = 0;
-	int txt_last;
+show_args(const char *msg, int argc, const char *argv[]) {
+	fprintf(stdout, "%s: ", msg);
 
-	/* find the end of the new files */
-	for (txt_last = 0; txt_last < argc; txt_last++) {
-		if (is_new_old_separator(argv[txt_last])) break;
+	int i;
+	for (i = 0; i < argc; i++) {
+		fprintf(stdout, "arg[%d] = %s; ", i, argv[i]);
 	}
-	txt_last--;
-
-	/* swap the names from the outer sides on */
-	while (txt_first < txt_last) {
-		const char *tmp = argv[txt_first];
-		argv[txt_first] = argv[txt_last];
-		argv[txt_last] = tmp;
-		txt_first++, txt_last--;
-	}
+	fprintf(stdout, "\n");
 }
+#endif	/* ARG_TEST */
 
 int
 main(int argc, const char *argv[]) {
@@ -116,16 +145,38 @@ main(int argc, const char *argv[]) {
 		argc -= nop, argv += nop;	/* and skip them */
 	}
 
+	/* Check options compatibility */
+	allow_at_most_one_out_of("dnpPT");
+	if (is_set_option('t')) {
+		/* threshold means percentages */
+		if (!is_set_option('p') && !is_set_option('P'))
+			fatal("option -t requires -p or -P");
+	}
+
+	/* Treat the simple options */
+	if (is_set_option('v')) {
+		fprintf(stdout, "Version %s\n", VERSION);
+		return 0;
+	}
+
+	if (is_set_option('P')) {
+		set_option('p');
+	}
+	if (is_set_option('p')) {
+		set_option('e');
+		set_option('s');
+	}
+
 	/* Treat the value options */
 	if (min_run_string) {
-		Min_Run_Size = strtoul(min_run_string, NULL, 10);
+		Min_Run_Size = atoi(min_run_string);
 		if (Min_Run_Size == 0)
 			fatal("bad or zero run size; form is: -r N");
 	}
 	if (page_width_string) {
 		Page_Width = atoi(page_width_string);
-		if (Page_Width == 0)
-			fatal("bad or zero page width; form is: -w N");
+		if (Page_Width <= 0)
+			fatal("bad or zero page width");
 	}
 	if (threshold_string) {
 		Threshold_Percentage = atoi(threshold_string);
@@ -135,60 +186,50 @@ main(int argc, const char *argv[]) {
 	if (output_name) {
 		Output_File = fopen(output_name, "w");
 		if (Output_File == 0) {
-			char msg[500];
+			char *msg = (char *)Malloc(strlen(output_name) + 100);
 
-			sprintf(msg, "cannot open output file %s",
+			sprintf(msg, "cannot open output file `%s'",
 				output_name);
 			fatal(msg);
 			/*NOTREACHED*/
 		}
 	}
 
+	/* Treat the input-determining options */
 	if (is_set_option('i')) {
+		/* read input file names from standard input */
 		if (argc != 0)
 			fatal("-i option conflicts with file arguments");
 		get_new_std_input_args(&argc, &argv);
 	}
-	else if (is_set_option('R')) {
+	if (is_set_option('R')) {
 		get_new_recursive_args(&argc, &argv);
 	}
 	/* (argc, argv) now represents new_file* [ / old_file*] */
-
-	if (is_set_option('P')) {
-		Threshold_Percentage = 1;
-		set_option('p');
-	}
-
-	if (is_set_option('p')) {
-		set_option('e');
-		set_option('s');
-	}
 
 	/* Here the real work starts */
 	Init_Language();
 
 	if (is_set_option('-')) {
 		/* Just the lexical scan */
-		while (argv[0] && !is_new_old_separator(argv[0])) {
-			Print_Stream(argv[0]);
+		while (argv[0]) {
+			const char *arg = argv[0];
+			if (!is_new_old_separator(arg)) {
+				Print_Stream(arg);
+			}
 			argv++;
 		}
 	}
-	else if (!is_set_option('p')) {
-		/* Runs */
+	else
+	if (is_set_option('p')) {
+		/* Show percentages */
+		read_and_compare_files(argc, argv, 1);
+		Show_Percentages();
+	} else {
+		/* Show runs */
 		read_and_compare_files(argc, argv, 1);
 		Retrieve_Runs();
 		Show_Runs();
-	} else {
-		/* Percentages */
-		/* To compute the percentages fairly, the input files are read
-		   twice, once in command line order, and once with the new
-		   files in reverse order.
-		*/
-		read_and_compare_files(argc, argv, 1);
-		reverse_new_input_files(argc, argv);
-		read_and_compare_files(argc, argv, 2);
-		Show_Percentages();
 	}
 
 	if (is_set_option('M')) {

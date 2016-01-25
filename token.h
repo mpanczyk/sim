@@ -1,6 +1,6 @@
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: token.h,v 2.12 2012-06-08 16:04:30 Gebruiker Exp $
+	$Id: token.h,v 2.12 2012-06-08 16:04:30 dick Exp $
 */
 
 /*

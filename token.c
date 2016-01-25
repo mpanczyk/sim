@@ -1,6 +1,6 @@
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: token.c,v 2.10 2012-06-08 16:04:30 Gebruiker Exp $
+	$Id: token.c,v 2.12 2013-04-28 16:30:43 dick Exp $
 */
 
 /*
@@ -21,11 +21,11 @@ Token_in_range(const Token tk, int low, int high) {
 
 static int
 check_and_print(
-	FILE *ofile, const char *name, char ch, char low, char high, char offset
+	FILE *ofile, const char *name, int ch, int low, int high, int offset
 ) {
 	int ch1 = ch + offset;
 	if (low <= ch1 && ch1 <= high) {
-		fprintf(ofile, "%s(%c)", name,ch1);
+		fprintf(ofile, "%s(%c)", name, (char)ch1);
 		return 1;
 	}
 	return 0;
@@ -37,7 +37,6 @@ check_and_print(
 #define	is_MTCT_token(tk)	(Token_in_range(tk, 0x0181, 0x019E))
 #define	is_META_token(tk)	(Token_in_range(tk, 0x01A1, 0x01FE))
 #define	is_hashed_token(tk)	(Token_in_range(tk, 0x0200, 0xFFFE))
-/* ZZ */
 
 void
 fprint_token(FILE *ofile, const Token tk) {

@@ -1,6 +1,6 @@
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: idf.c,v 2.16 2012-05-09 11:50:37 Gebruiker Exp $
+	$Id: idf.c,v 2.19 2015-01-17 10:20:40 dick Exp $
 */
 
 #include	<string.h>
@@ -13,11 +13,11 @@ Token
 idf_in_list(
 	const char *str,
 	const struct idf list[],
-	unsigned int listsize,
+	size_t listsize,
 	Token default_token
 ) {
 	int first = 0;
-	int last = (listsize / sizeof (struct idf)) - 1;
+	int last = (int) (listsize / sizeof (struct idf)) - 1;
 
 	while (first < last) {
 		int middle = (first + last) / 2;
@@ -45,6 +45,7 @@ idf_hashed(const char *str) {
 	while (*str) {
 		int ch = *str++ & 0377;
 
+		/* ignore spaces in spaced words */
 		if (ch == ' ') continue;
 
 		/* -1 <= h <= 2^31-1 */
@@ -72,4 +73,15 @@ idf_hashed(const char *str) {
 	/* N_REGULAR_TOKENS <= h < N_TOKENS - 1 */
 	return int2Token(h);
 	/* this avoids the regular tokens and End_Of_Line */
+}
+
+void
+lower_case(char *str) {
+	char *s;
+
+	for (s = str; *s; s++) {
+		if ('A' <= *s && *s <= 'Z') {
+			*s += (-'A' + 'a');
+		}
+	}
 }
