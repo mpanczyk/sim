@@ -1,11 +1,13 @@
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: language.c,v 2.3 2013-04-28 16:30:41 dick Exp $
+	$Id: language.c,v 2.4 2016-08-05 15:31:19 dick Exp $
 */
 
 /*
-	This is a dummy implementation of the abstract class 'language'.
-	The actual implementation is provided by one of the *lang.l files.
+	This is a dummy implementation of the abstract class 'language', so
+	there will not be a language.o file.
+	The actual implementation is provided by Xlang.o deriving through
+	Xlang.c from the pertinent Xlang.l file.
 */
 
 #include	<stdio.h>
@@ -13,6 +15,8 @@
 
 #include	"token.h"
 #include	"language.h"
+
+const char *Subject;
 
 void
 Init_Language(void) {

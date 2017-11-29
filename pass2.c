@@ -1,6 +1,6 @@
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: pass2.c,v 2.23 2015-01-12 09:16:13 dick Exp $
+	$Id: pass2.c,v 2.24 2016-05-13 19:00:53 dick Exp $
 */
 
 #include	<stdio.h>
@@ -132,7 +132,7 @@ static void
 db_print_pos(const struct position *pos) {
 	fprintf(Debug_File, "pos type = %s; %s count = %u",
 		(pos->ps_type == 0 ? "first" : " last"),
-		token_name,
+		Token_Name,
 		pos->ps_tk_cnt
 	);
 	fprintf(Debug_File, ", line # = ");

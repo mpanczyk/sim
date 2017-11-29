@@ -1,7 +1,7 @@
 %{
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: textlang.l,v 1.17 2015-01-22 20:54:31 dick Exp $
+	$Id: textlang.l,v 1.21 2016-05-13 19:00:55 dick Exp $
 */
 
 /*
@@ -24,17 +24,14 @@ size_t lex_non_ascii_cnt;
 
 /* Language-dependent code */
 
+const char *Subject = "text";
+
 void
 Init_Language(void) {
 	if (is_set_option('f') || is_set_option('F'))
 		fatal("options -f or -F not applicable in sim_text");
-	token_name = "word";
-	if (!min_run_string) {
-		Min_Run_Size = 8;
-	}
-	if (!threshold_string) {
-		Threshold_Percentage = 20;
-	}
+	Token_Name = "word";
+	Threshold_Percentage = 20;
 }
 
 /*ARGSUSED*/

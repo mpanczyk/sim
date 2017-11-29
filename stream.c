@@ -1,6 +1,6 @@
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: stream.c,v 2.13 2015-01-22 14:38:28 dick Exp $
+	$Id: stream.c,v 2.14 2016-05-13 19:00:54 dick Exp $
 */
 
 #include	<stdio.h>
@@ -65,7 +65,7 @@ Print_Stream(const char *fname) {
 		return;
 	}
 
-	fprintf(Output_File, " showing the %s stream\n", token_name);
+	fprintf(Output_File, " showing the %s stream\n", Token_Name);
 
 	lex_token = End_Of_Line;
 	do {
@@ -73,7 +73,7 @@ Print_Stream(const char *fname) {
 			fprintf(Output_File,
 				"line # = %s, %s # = %s:\n",
 				size_t2string(lex_nl_cnt),
-				token_name,
+				Token_Name,
 				size_t2string(lex_tk_cnt)
 			);
 		}

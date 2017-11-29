@@ -1,9 +1,9 @@
 #	This file is part of the software similarity tester SIM.
 #	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-#	$Id: Makefile,v 2.66 2015-04-29 18:18:21 dick Exp $
+#	$Id: Makefile,v 2.97 2017-03-19 09:49:29 dick Exp $
 #
 
-VERSION="\"2.89 of 2015-04-29\""
+VERSION="-DVERSION=\"3.0.1 of 2017-08-15\""
 
 #	E N T R Y   P O I N T S
 
@@ -15,9 +15,11 @@ help:
 	@echo  'exes:           create executables in MSDOS'
 	@echo  'install:        install all binaries'
 	@echo  ''
-	@echo  'man:            create sim.pdf'
+	@echo  'view_man:       view sim.pdf'
 	@echo  'lint:           lint sim sources'
 	@echo  'simsim:         run sim_c on the sim sources'
+	@echo  'view_SPC:       view the percentage computation document'
+	@echo  'chklat:         do a LaTeX check on the .tex documents'
 	@echo  ''
 	@echo  'fresh:          remove created files'
 
@@ -29,7 +31,7 @@ help:
 #	=============== including ../lib/sysidf.mk here
 #	This file is part of the auxiliary libraries.
 #	Written by Dick Grune, dick@dickgrune.com
-#	$Id: sysidf.mk,v 1.17 2014-07-28 09:18:13 dick Exp $
+#	$Id: sysidf.mk,v 1.18 2016-04-22 15:11:58 dick Exp $
 #
 
 ################################################################
@@ -69,12 +71,16 @@ LN =		ln
 ZIP =		zip -o
 
 ################################################################
-# General, compiling:
+# General, C compilation:
 CC =		gcc -D$(SYSTEM) -D$(SUBSYSTEM)
 LINT =		lint -ansi -D$(SYSTEM) -D$(SUBSYSTEM)
 LINTFLAGS =	-xh
 
-# General, manual:
+# General, text:
+LATEX =		pdflatex
+SHOW_PDF =	evince
+SHOW_PDF =	acroread
+SHOW_PDF =	pdfview
 GROFF =		groff -man
 GROFF =		man2pdf
 
@@ -88,8 +94,8 @@ GROFF =		man2pdf
 #	=============== end of ../lib/sysidf.mk
 
 # Compiling
-MEMORY =	-DMEMLEAK -DMEMCLOBBER
-CFLAGS =	-DVERSION=$(VERSION) $(MEMORY) -O4
+MEMORY =	-DMEMCHECK -DMEMCLOBBER
+CFLAGS =	$(VERSION) $(MEMORY) -O4
 LIBFLAGS =	#
 LINTFLAGS =	$(MEMORY) -h# -X
 LOADFLAGS =	-s#			# strip symbol table
@@ -103,83 +109,113 @@ DEBUG_H =	debug.h
 
 #	T E S T   P A R A M E T E R S
 
-# percentage test
-TEST_LANG =	c
-TEST_OPT =	-p
-TEST_INP =	*.l
-
-# text test
-TEST_LANG =	text
-TEST_OPT =	-r 5
-TEST_INP =	test_seplet
-
 # Rumen Stevanov test
 TEST_LANG =	text
-TEST_OPT =	-p
-TEST_INP =	Rumen_Stefanov/new/*.txt
+TEST_OPT =	-pPae -r4 -O -t4
+TEST_INP =	Contributors/Rumen_Stefanov/new/*.txt
 
-# Kuhl test 1
-TEST_LANG =	c
-TEST_OPT =	-p
-TEST_INP =	Kuhl/simc1.c Kuhl/simc2.c
+# slash test
+TEST_LANG =	text
+TEST_OPT =	-r24 -M clang.c pascallang.c "|" textlang.c
+TEST_INP =
 
-# Kuhl test 2
-TEST_LANG =	c
-TEST_OPT =	-p
-TEST_INP =	Kuhl/simc2.c Kuhl/simc1.c
+# spaced word test
+TEST_LANG =	text
+TEST_OPT =	-r 5
+TEST_INP =	testfiles/test_seplet
 
 # -i option test
 TEST_LANG =	c
 TEST_OPT =	-f -r 20 -R -i <option-i.inp
 TEST_INP =	#
 
-# regular test
-TEST_LANG =	c
-TEST_OPT =	-r24
-TEST_INP =	pass3.c
+# overlap  test, foo^100 vs. foo^150
+TEST_LANG =	text
+TEST_OPT =	-r50 -p
+TEST_OPT =	-r50
+TEST_INP =	foo_100
+TEST_INP =	foo_100 foo_150
 
+# single file test
+TEST_LANG =	c
+TEST_OPT =	-r24 -M
+TEST_INP =	pass3.c pass3.c	# compares 1st to 2nd, then 2nd to 2nd
+
+# tight match test, foo_100 has exactly 100 tokens
+TEST_LANG =	text
+TEST_OPT =	-r50
+TEST_INP =	foo_100
+
+# percentage test
+TEST_LANG =	c
+TEST_OPT =	-puae
+TEST_INP =	*.l
+
+# larger test
+TEST_LANG =	text
+TEST_OPT =	-r24 -M -puae
+TEST_INP = clang.c textlang.c
+TEST_INP = textlang.c clang.c javalang.c
+
+# test UTF-8 text
+TEST_LANG =	text
+TEST_OPT =	-r12 -MO -T -w80 -d
+TEST_INP =	Korean1.txt Korean2.txt
+
+# test UTF-8 program
+TEST_LANG =	c
+TEST_OPT =	-r12 -MO -w80 -d
+TEST_INP =	utf8test.c utf8test.c
+
+# C++ test
+TEST_LANG =	c++
+TEST_OPT =	-r8 -MO -
+TEST_INP =	c++test.c++ c++test.c++#	# for lack of real C++ files
+
+# test
+TEST_LANG =	c
+TEST_OPT =	-r10 -MO -
+TEST_INP =	clang.c pascallang.c
+TEST_INP =	pass2.c pass1.c
 
 #	I N T R O D U C T I O N
 
 #	Each module (set of programs that together perform some function)
 #	has the following sets of files defined for it:
-#		_FLS	all files of that module, for, e.g.,
-#			sharring, inventory, etc.
 #		_SRC	the source files, from which other files derive
 #		_CFS	the C-files, from which the object files derive
 #		_OBJ	object files
-#		_GRB	garbage files produced by compiling the module
+#		_GRB	garbage files produced by the module
 #
 #	(This is a feeble attempt at software-engineering a Makefile.)
 #
 
-test:		sim.res stream.res percentages.res	# three simple tests
+test:		sim.res stream.res percentages.res version.res
 
 
 #	B I N A R I E S
 
-BINARIES =	sim_c$(EXE) sim_java$(EXE) sim_pasc$(EXE) sim_m2$(EXE) \
-		sim_lisp$(EXE) sim_mira$(EXE) sim_text$(EXE)
+BINARIES =	sim_c$(EXE) sim_c++(EXE) sim_java$(EXE) sim_pasc$(EXE) \
+		sim_m2$(EXE) sim_lisp$(EXE) sim_mira$(EXE) sim_text$(EXE)
 
 binaries:	$(BINARIES)
 
-EXES =		sim_c.exe sim_java.exe sim_pasc.exe sim_m2.exe \
-		sim_lisp.exe sim_mira.exe sim_text.exe
+EXES =		sim_c.exe sim_c++.exe sim_java.exe sim_pasc.exe \
+     		sim_m2.exe sim_lisp.exe sim_mira.exe sim_text.exe
 exes:		$(EXES)
 
 
 #	A U X I L I A R Y   M O D U L E S
 
 # Common modules:
-COM_CFS =	token.c lex.c stream.c text.c tokenarray.c error.c $(DEBUG_C) \
+COM_CFS =	token.c lex.c stream.c text.c tokenarray.c $(DEBUG_C) \
 		ForEachFile.c fname.c Malloc.c any_int.c
-COM_OBJ =	token.o lex.o stream.o text.o tokenarray.o error.o $(DEBUG_O) \
+COM_OBJ =	token.o lex.o stream.o text.o tokenarray.o $(DEBUG_O) \
 		ForEachFile.o fname.o Malloc.o any_int.o
-COM_SRC =	token.h lex.h stream.h text.h tokenarray.h error.h $(DEBUG_H) \
+COM_SRC =	token.h lex.h stream.h text.h tokenarray.h $(DEBUG_H) \
 		ForEachFile.h fname.h Malloc.h any_int.h \
 		lang.h language.h \
 		sortlist.spc sortlist.bdy system.par $(COM_CFS)
-COM_FLS =	$(COM_SRC)
 
 # C files for the abstract modules:
 ABS_CFS =	lang.c language.c
@@ -188,13 +224,11 @@ ABS_CFS =	lang.c language.c
 IDF_CFS =	idf.c
 IDF_OBJ =	idf.o
 IDF_SRC =	idf.h $(IDF_CFS)
-IDF_FLS =	$(IDF_SRC)
 
 # The runs package:
 RUNS_CFS =	runs.c percentages.c
 RUNS_OBJ =	runs.o percentages.o
-RUNS_SRC =	runs.h percentages.h aiso.spc aiso.bdy $(RUNS_CFS)
-RUNS_FLS =	$(RUNS_SRC)
+RUNS_SRC =	runs.h percentages.h $(RUNS_CFS)
 
 # The main program:
 MAIN_CFS =	sim.c options.c newargs.c hash.c compare.c add_run.c \
@@ -204,13 +238,13 @@ MAIN_OBJ =	sim.o options.o newargs.o hash.o compare.o add_run.o \
 MAIN_SRC =	sim.h options.h newargs.h hash.h compare.h add_run.h \
 		pass1.h pass2.h pass3.h \
 		debug.par settings.par $(MAIN_CFS)
-MAIN_FLS =	$(MAIN_SRC)
+
+sim.o:	 	Makefile	# because of $(VERSION)
 
 # The similarity tester without the language part:
 SIM_CFS =	$(COM_CFS) $(IDF_CFS) $(RUNS_CFS) $(MAIN_CFS)
 SIM_OBJ =	$(COM_OBJ) $(IDF_OBJ) $(RUNS_OBJ) $(MAIN_OBJ)
 SIM_SRC =	$(COM_SRC) $(IDF_SRC) $(RUNS_SRC) $(MAIN_SRC)
-SIM_FLS =	$(COM_FLS) $(IDF_FLS) $(RUNS_FLS) $(MAIN_FLS)
 
 
 #	L A N G U A G E S
@@ -219,13 +253,11 @@ SIM_FLS =	$(COM_FLS) $(IDF_FLS) $(RUNS_FLS) $(MAIN_FLS)
 ALG_CFS =	algollike.c
 ALG_OBJ =	algollike.o
 ALG_SRC =	algollike.h $(ALG_CFS)
-ALG_FLS =	$(ALG_SRC)
 
 # The C Language module:					# C
 CLANG_CFS =	clang.c
 CLANG_OBJ =	clang.o
 CLANG_SRC =	clang.l
-CLANG_FLS =	$(CLANG_SRC)
 
 clang.c:	clang.l
 		$(LEX) -t clang.l >$@
@@ -241,11 +273,29 @@ SIM_GRB +=	clang.c sim_c
 $(BINDIR)/sim_c$(EXE):	sim_c$(EXE)
 		$(COPY) sim_c$(EXE) $@
 
+# The C++ Language module:					# C++
+C++LANG_CFS =	c++lang.c
+C++LANG_OBJ =	c++lang.o
+C++LANG_SRC =	c++lang.l
+
+c++lang.c:	c++lang.l
+		$(LEX) -t c++lang.l >$@
+
+SIM_C++_CFS =	$(SIM_CFS) $(ALG_CFS) $(C++LANG_CFS)
+SIM_C++_OBJ =	$(SIM_OBJ) $(ALG_OBJ) $(C++LANG_OBJ)
+
+sim_c++$(EXE):	$(SIM_C++_OBJ)
+		$(LOADER) $(SIM_C++_OBJ) -o $@
+
+SIM_GRB +=	c++lang.c sim_c++
+
+$(BINDIR)/sim_c++$(EXE):	sim_c++$(EXE)
+		$(COPY) sim_c++$(EXE) $@
+
 # The Java Language module:					# Java
 JAVALANG_CFS =	javalang.c
 JAVALANG_OBJ =	javalang.o
 JAVALANG_SRC =	javalang.l
-JAVALANG_FLS =	$(JAVALANG_SRC)
 
 javalang.c:	javalang.l
 		$(LEX) -t javalang.l >$@
@@ -265,7 +315,6 @@ $(BINDIR)/sim_java$(EXE):	sim_java$(EXE)
 PASCLANG_CFS =	pascallang.c
 PASCLANG_OBJ =	pascallang.o
 PASCLANG_SRC =	pascallang.l
-PASCLANG_FLS =	$(PASCLANG_SRC)
 
 pascallang.c:	pascallang.l
 		$(LEX) -t pascallang.l >pascallang.c
@@ -285,7 +334,6 @@ $(BINDIR)/sim_pasc$(EXE):	sim_pasc$(EXE)
 M2LANG_CFS =	m2lang.c
 M2LANG_OBJ =	m2lang.o
 M2LANG_SRC =	m2lang.l
-M2LANG_FLS =	$(M2LANG_SRC)
 
 m2lang.c:	m2lang.l
 		$(LEX) -t m2lang.l >$@
@@ -305,7 +353,6 @@ $(BINDIR)/sim_m2$(EXE):	sim_m2$(EXE)
 LISPLANG_CFS =	lisplang.c
 LISPLANG_OBJ =	lisplang.o
 LISPLANG_SRC =	lisplang.l
-LISPLANG_FLS =	$(LISPLANG_SRC)
 
 lisplang.c:	lisplang.l
 		$(LEX) -t lisplang.l >$@
@@ -325,7 +372,6 @@ $(BINDIR)/sim_lisp$(EXE):	sim_lisp$(EXE)
 MIRALANG_CFS =	miralang.c
 MIRALANG_OBJ =	miralang.o
 MIRALANG_SRC =	miralang.l
-MIRALANG_FLS =	$(MIRALANG_SRC)
 
 miralang.c:	miralang.l
 		$(LEX) -t miralang.l >$@
@@ -345,7 +391,6 @@ $(BINDIR)/sim_mira$(EXE):	sim_mira$(EXE)
 TEXTLANG_CFS =	textlang.c
 TEXTLANG_OBJ =	textlang.o
 TEXTLANG_SRC =	textlang.l
-TEXTLANG_FLS =	$(TEXTLANG_SRC)
 
 textlang.c:	textlang.l
 		$(LEX) -t textlang.l >$@
@@ -372,25 +417,34 @@ $(BINDIR)/sim_text$(EXE):	sim_text$(EXE)
 
 
 
-
-
-
 #	T E S T S
 
 # Some simple tests:
 .PHONY:		sim.res percentages.res
 
-sim.res:	sim_$(TEST_LANG)$(EXE)	# no TEST_INP required, for error tests
+sim.res:	sim_$(TEST_LANG)$(EXE) $(TEST_INP)
 		./sim_$(TEST_LANG)$(EXE) $(TEST_OPT) $(TEST_INP)
 
 stream.res:	sim_$(TEST_LANG)$(EXE)
 		./sim_$(TEST_LANG)$(EXE) -- $(TEST_OPT) $(TEST_INP) >$@
 		wc $@ $(TEST_INP)
-
-percentages.res:sim_$(TEST_LANG)$(EXE)
-		./sim_$(TEST_LANG)$(EXE) -p $(TEST_OPT) $(TEST_INP)
-
 TEST_GRB =	stream.res
+
+PERC_TEST_EXE	=	sim_text$(EXE)
+PERC_TEST_FILES =	foo_100 foo_150
+PERC_TEST_EXE	=	sim_c$(EXE)
+PERC_TEST_FILES =	pascallang.l clang.l javalang.l
+percentages.res:$(PERC_TEST_EXE) $(PERC_TEST_FILES)
+		@echo ''
+		./$(PERC_TEST_EXE) -T -p $(PERC_TEST_FILES)
+		@echo ''
+		./$(PERC_TEST_EXE) -T -pa $(PERC_TEST_FILES)
+		@echo ''
+		./$(PERC_TEST_EXE) -T -pae $(PERC_TEST_FILES)
+
+version.res:	sim_$(TEST_LANG)$(EXE)
+		./sim_$(TEST_LANG)$(EXE) -v
+
 
 # More simple tests, using the C version only:
 simsim:		sim_c$(EXE) $(SIM_CFS) $(ALG_CFS)
@@ -403,30 +457,30 @@ lint:		$(SIM_SRC) $(ALG_SRC) $(ABS_CFS)
 
 #	O T H E R   E N T R I E S
 
-# Sets of files: general, modules, main programs, languages
-CFS =		$(SIM_CFS) $(ALG_CFS) \
-		$(CLANG_CFS) $(JAVALANG_CFS) $(PASCLANG_CFS) $(M2LANG_CFS) \
-		$(LISPLANG_CFS) $(MIRALANG_CFS) $(TEXTLANG_CFS)
-OBJ =		$(SIM_OBJ) $(ALG_OBJ) \
-		$(CLANG_OBJ) $(JAVALANG_OBJ) $(PASCLANG_OBJ) $(M2LANG_OBJ) \
-		$(LISPLANG_OBJ) $(MIRALANG_OBJ) $(TEXTLANG_OBJ)
-SRC =		$(SIM_SRC) $(ALG_SRC) \
-		$(CLANG_SRC) $(JAVALANG_SRC) $(PASCLANG_SRC) $(M2LANG_SRC) \
-		$(LISPLANG_SRC) $(MIRALANG_SRC) $(TEXTLANG_SRC)
-FLS =		$(SIM_FLS) $(ALG_FLS) \
-		$(CLANG_FLS) $(JAVALANG_FLS) $(PASCLANG_FLS) $(M2LANG_FLS) \
-		$(LISPLANG_FLS) $(MIRALANG_FLS) $(TEXTLANG_FLS) \
-		sysidf.mk sysidf.msdos sysidf.unix
-DOC =		README sim.1 sim.txt sim.html ChangeLog Answers TechnReport
-
 # Documentation
 
-man:		sim.pdf
+view_man:	sim.pdf
+		$(SHOW_PDF) sim.pdf
+
+%.pdf:		%.tex
+		$(LATEX) $< || log2errmsg <$*.log
+		$(LATEX) $<
+		$(LATEX) $<
+
+SPC =		Similarity_Percentage_Computation
+view_SPC:	$(SPC).pdf
+		$(SHOW_PDF) $(SPC).pdf
+DOCS +=		$(SPC).pdf
+
+# LaTeX checker
+chklat:
+		chklat *.tex
 
 # Installation
 install_all:	install			# just a synonym
 install:	$(MAN1DIR)/sim.1 \
 		$(BINDIR)/sim_c$(EXE) \
+		$(BINDIR)/sim_c++$(EXE) \
 		$(BINDIR)/sim_java$(EXE) \
 		$(BINDIR)/sim_pasc$(EXE) \
 		$(BINDIR)/sim_m2$(EXE) \
@@ -445,7 +499,7 @@ clean:
 		-rm -f *.o
 		-rm -f $(SIM_GRB)
 		-rm -f $(TEST_GRB)
-		-rm -f $(DOC_GRB)
+		-rm -f *.aux *.log *.out
 		-rm -f a.out a.exe sim.txt core mon.out
 
 fresh:		clean
@@ -456,20 +510,21 @@ fresh:		clean
 # DO NOT DELETE THIS LINE -- make depend depends on it.
 ForEachFile.o: ForEachFile.c ForEachFile.h fname.h
 Malloc.o: Malloc.c any_int.h Malloc.h
-add_run.o: add_run.c sim.h debug.par text.h runs.h aiso.spc percentages.h \
- Malloc.h options.h error.h add_run.h
-algollike.o: algollike.c options.h error.h token.h algollike.h
+add_run.o: add_run.c sim.h text.h runs.h percentages.h options.h \
+ add_run.h
+algollike.o: algollike.c sim.h options.h token.h algollike.h
 any_int.o: any_int.c any_int.h
+c++lang.o: c++lang.c options.h token.h language.h algollike.h idf.h lex.h \
+ lang.h
 clang.o: clang.c options.h token.h language.h algollike.h idf.h lex.h \
  lang.h
 compare.o: compare.c sim.h text.h token.h tokenarray.h hash.h language.h \
  options.h add_run.h compare.h debug.par
 count_sim_dup.o: count_sim_dup.c
 debug.o: debug.c debug.h
-error.o: error.c sim.h error.h
 fname.o: fname.c fname.h
-hash.o: hash.c system.par debug.par sim.h text.h Malloc.h error.h \
- any_int.h token.h language.h tokenarray.h options.h hash.h
+hash.o: hash.c system.par debug.par sim.h text.h Malloc.h any_int.h \
+ token.h language.h tokenarray.h options.h hash.h
 idf.o: idf.c system.par token.h idf.h
 javalang.o: javalang.c options.h token.h language.h algollike.h idf.h \
  lex.h lang.h
@@ -477,30 +532,31 @@ lang.o: lang.c token.h language.h algollike.h idf.h lex.h lang.h
 language.o: language.c token.h language.h
 lex.o: lex.c lex.h
 lisplang.o: lisplang.c token.h language.h algollike.h lex.h lang.h idf.h
+m.o: m.c
 m2lang.o: m2lang.c options.h token.h language.h algollike.h idf.h lex.h \
  lang.h
 miralang.o: miralang.c token.h language.h algollike.h lex.h lang.h idf.h
-newargs.o: newargs.c sim.h ForEachFile.h fname.h Malloc.h error.h \
- newargs.h
-options.o: options.c options.h
+newargs.o: newargs.c sim.h ForEachFile.h fname.h Malloc.h newargs.h
+options.o: options.c sim.h token.h language.h options.h
 pascallang.o: pascallang.c options.h token.h language.h algollike.h idf.h \
  lex.h lang.h
 pass1.o: pass1.c debug.par sim.h text.h token.h tokenarray.h lang.h \
- error.h options.h pass1.h
+ options.h pass1.h
 pass2.o: pass2.c debug.par sim.h token.h text.h lang.h pass2.h \
  sortlist.bdy
-pass3.o: pass3.c system.par debug.par sim.h text.h token.h runs.h \
- aiso.spc Malloc.h error.h options.h pass3.h percentages.h
-percentages.o: percentages.c debug.par sim.h text.h runs.h aiso.spc \
- options.h Malloc.h error.h percentages.h sortlist.bdy
-runs.o: runs.c sim.h text.h runs.h aiso.spc debug.par aiso.bdy Malloc.h
+pass3.o: pass3.c system.par settings.par debug.par sim.h text.h token.h \
+ runs.h options.h pass3.h percentages.h
+percentages.o: percentages.c debug.par sim.h text.h options.h Malloc.h \
+ percentages.h sortlist.bdy
+runs.o: runs.c sim.h text.h runs.h Malloc.h debug.par sortlist.bdy
 sim.o: sim.c system.par settings.par sim.h options.h newargs.h token.h \
- language.h error.h text.h runs.h aiso.spc hash.h compare.h pass1.h \
- pass2.h pass3.h percentages.h stream.h lang.h Malloc.h any_int.h
+ tokenarray.h language.h text.h runs.h hash.h compare.h pass1.h pass2.h \
+ pass3.h percentages.h stream.h lang.h Malloc.h any_int.h
 stream.o: stream.c system.par sim.h options.h token.h lang.h stream.h
 t.o: t.c
 text.o: text.c debug.par sim.h token.h stream.h lang.h Malloc.h options.h \
- error.h text.h
+ text.h
 textlang.o: textlang.c sim.h token.h idf.h lex.h lang.h language.h
 token.o: token.c token.h
-tokenarray.o: tokenarray.c error.h Malloc.h token.h lang.h tokenarray.h
+tokenarray.o: tokenarray.c sim.h Malloc.h token.h lang.h tokenarray.h
+utf8test.o: utf8test.c

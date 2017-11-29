@@ -1,7 +1,7 @@
 %{
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: m2lang.l,v 2.19 2013-04-28 16:30:41 dick Exp $
+	$Id: m2lang.l,v 2.21 2017-03-19 09:23:19 dick Exp $
 */
 
 /*
@@ -207,6 +207,8 @@ const Token Closers[] = {
 
 /* Language-dependent code */
 
+const char *Subject = "Modula-2 programs";
+
 void
 Init_Language(void) {
 	Init_Algol_Language(Non_Finals, Non_Initials, Openers, Closers);
@@ -230,11 +232,11 @@ Best_Run_Size(const Token *str, size_t size) {
 %Start	Comment
 
 Layout		([ \t\r\f])
-ASCII95		([- !"#$%&'()*+,./0-9:;<=>?@A-Z\[\\\]^_`a-z{|}~])
+ASCII95		([\040-\176])
 
 AnyQuoted	(\\.)
-QuStrChar	([^"\n\\]|{AnyQuoted})
-ApoStrChar	([^'\n\\]|{AnyQuoted})
+QuStrChar	([^\"\n\\]|{AnyQuoted})
+ApoStrChar	([^\'\n\\]|{AnyQuoted})
 
 StartComment	("(*")
 EndComment	("*)")

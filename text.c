@@ -1,6 +1,6 @@
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: text.c,v 1.18 2015-01-17 10:20:41 dick Exp $
+	$Id: text.c,v 1.23 2016-08-03 19:14:04 dick Exp $
 */
 
 #include	<stdio.h>
@@ -13,7 +13,6 @@
 #include	"lang.h"
 #include	"Malloc.h"
 #include	"options.h"
-#include	"error.h"
 #include	"text.h"
 
 struct text *Text;			/* to be filled in by Malloc() */
@@ -132,6 +131,16 @@ Close_Text(enum Pass pass, struct text *txt) {
 	Close_Stream();
 }
 
+void
+Free_Text(void) {
+	if (nl_buff) {
+		Free(nl_buff); nl_buff = 0;
+	}
+	if (Text) {
+		Free(Text); Text = 0;
+	}
+}
+
 /*							NEWLINE CACHING */
 
 /*	To speed up pass2 which is interested in token positions at line ends,
@@ -142,8 +151,9 @@ Close_Text(enum Pass pass, struct text *txt) {
 
 	The recording of token position differences at End_Of_Line is optional,
 	and is switched off if
-	-	there is not room enough for the newline buffer.
-	-	a difference would not fit in the field in the struct.
+	-	there is not room enough for the newline buffer;
+	-	a difference would not fit in the field in the struct;
+	-	we are reporting percentages.
 	Switching off is done by freeing the buffer and setting nl_buff to 0.
 	Anybody using nl_buff should therefore test for nl_buff being zero.
 */
@@ -152,6 +162,9 @@ static void abandon_nl_buff(const char *);
 
 static void
 init_nl_buff(void) {
+	/* if we are doing percentages, we don't need the nl_buff mechanism */
+	if (is_set_option('p')) return;
+
 	/* Allocate the newline buffer, if possible */
 	nl_size = 0 + NL_START;
 	nl_buff = (struct newline *)TryMalloc(sizeof (struct newline)*nl_size);
@@ -201,7 +214,7 @@ abandon_nl_buff(const char *msg) {
 	fprintf(Debug_File, "abandon_nl_buff, %s\n", msg);
 #endif	/* DB_BUFF */
 	if (nl_buff) {
-		Free((char *)nl_buff);
+		Free(nl_buff);
 		nl_buff = 0;
 	}
 }

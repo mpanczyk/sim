@@ -1,7 +1,7 @@
 %{
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: pascallang.l,v 2.20 2015-01-17 10:20:40 dick Exp $
+	$Id: pascallang.l,v 2.22 2017-03-19 09:23:20 dick Exp $
 */
 
 /*
@@ -142,6 +142,8 @@ const Token Closers[] = {
 
 /* Language-dependent code */
 
+const char *Subject = "Pascal programs";
+
 void
 Init_Language(void) {
 	Init_Algol_Language(Non_Finals, Non_Initials, Openers, Closers);
@@ -165,10 +167,10 @@ Best_Run_Size(const Token *str, size_t size) {
 %Start	Comment
 
 Layout		([ \t\r\f])
-ASCII95		([- !"#$%&'()*+,./0-9:;<=>?@A-Z\[\\\]^_`a-z{|}~])
+ASCII95		([\040-\176])
 
 AnyQuoted	(\\.)
-StrChar		([^'\n\\]|{AnyQuoted})
+StrChar		([^\'\n\\]|{AnyQuoted})
 
 StartComment	("{"|"(*")
 EndComment	("}"|"*)")

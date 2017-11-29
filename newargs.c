@@ -1,6 +1,6 @@
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: newargs.c,v 2.9 2013-04-28 16:30:41 dick Exp $
+	$Id: newargs.c,v 2.11 2016-05-13 19:00:52 dick Exp $
 */
 
 #include	<stdio.h>
@@ -8,7 +8,6 @@
 #include	"sim.h"
 #include	"ForEachFile.h"
 #include	"Malloc.h"
-#include	"error.h"
 #include	"newargs.h"
 
 #define	ARGS_INCR	1024
@@ -118,11 +117,11 @@ get_new_std_input_args(int *argcp, const char **argvp[]) {
 	*argcp = argc, *argvp = argv;
 }
 
-static void
+static int
 register_file(const Fchar *fn, const char *msg, const struct stat *fs) {
 	if (msg) {
 		fprintf(stderr, "could not handle file %s: %s\n", fn, msg);
-		return;
+		return 0;
 	}
 
 	if (	/* it is a non-empty regular file */
@@ -130,6 +129,7 @@ register_file(const Fchar *fn, const char *msg, const struct stat *fs) {
 	) {
 		add_string_to_args(fn);
 	}
+	return 1;
 }
 
 static char *

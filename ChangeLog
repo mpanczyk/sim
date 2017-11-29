@@ -1,4 +1,67 @@
-2014-02-17  Dick Grune  <Gebruiker@GEBRUIKER-PC>
+2017-03-19  Dick Grune  <Gebruiker@GEBRUIKER-PC>
+
+	*  c++lang.l contributed by Evin Murphy (evin.murphy@ucdconnect.ie).
+
+2016-08-07  Dick Grune  <Gebruiker@GEBRUIKER-PC>
+
+	* compare.c (lcs): Finding the text into which i1 points was done by
+	linear search. Replaced by binary search. This resulted in no direct
+	improvement but should be beneficial for very large numbers of files.
+
+2016-08-05  Dick Grune
+
+	* hash.c (make_forward_references_perfect): This routine now
+	constructs perfect forward references. This allows the comparison code
+	in compare.c (lcs) to skip the first Min_Run_Size tokens when
+	comparing two chunks. This yields about 8% speed-up.
+
+2016-08-03  Dick Grune
+
+	* hash.c (make_forward_references_using_hash): A lot of work was being
+	done to compute the hash value of a run, using sampling etc. A new
+	scheme was implemented in which the hash value consists of all tokens
+	in the run, each circularly left-shifted over a distance proportional
+	to its position in the run. This value can be computed incrementally
+	in constant time, by removing the oldest and adding the newest token
+	at each position.
+	Care had to be taken not to produce negative values for entities of
+	type size_t.
+	For moderately large comparisons (~ 10M tokens) this yields an
+	over-all speed-up of about 20%.
+
+2016-05-29  Dick Grune
+
+	* pass3.c: Surprisingly, very large runs of the program can get out of
+	memory far into the computation, in spite of the fact that sim
+	allocates almost all its memory while reading the input. However, the
+	found runs of text are collected using Mallocked memory, for producing
+	sorted output. In many cases one would rather have unsorted output
+	than no output at all. Decided to implement the -u option, for
+	unsorted output, thus not using any additional memory.
+
+2016-05-13  Dick Grune
+
+	* compare.c (lcs): the -X option works. It uses the linear algorithm
+	to compare a file F to two segments of the text: the segment from the
+	start of the text to the start of F, and from the end of F to the end
+	of the text. Runs found are then reported in percentages.
+
+2016-05-06  Dick Grune
+
+	* compare.c: The results of the analysis in
+	Similarity_Percentage_Computation.tex have been implemented, and under
+	the -p option percentages are now computed consistently. In
+	particular, the files in the directory Contributors/Debora_Weber-Wulff/
+	yield the same relative percentages independent of the order they are
+	entered in; see Pfubar_shuffle and Pslash_shuffle. Note: both parts of
+	Pslash_shuffle were shuffled independently.
+
+2016-04-10  Dick Grune
+
+	* runs.c: aiso (arbitrary in sorted out) package replaced by an
+	instantiation of the package sortlist.
+
+2014-02-17  Dick Grune
 
 	* sim.c (is_new_old_separator): MinGW sometimes (?) interprets the /
 	as a command-line argument as a reference to the MinGW tree, which
@@ -689,5 +752,5 @@
 
 #	This file is part of the software similarity tester SIM.
 #	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-#	$Id: ChangeLog,v 2.25 2014-02-17 11:21:39 dick Exp $
+#	$Id: ChangeLog,v 2.33 2017-03-19 09:30:37 dick Exp $
 #

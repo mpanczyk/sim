@@ -1,18 +1,18 @@
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: tokenarray.c,v 1.16 2015-01-12 09:16:13 dick Exp $
+	$Id: tokenarray.c,v 1.22 2016-05-29 15:26:50 dick Exp $
 */
 
 #include	<stdio.h>
 #include	<stdlib.h>
 
-#include	"error.h"
+#include	"sim.h"
 #include	"Malloc.h"
 #include	"token.h"
 #include	"lang.h"
 #include	"tokenarray.h"
 
-#define	TK_START	16384		/* initial token array size */
+#define	Initial_Token_Array_Size	16384
 
 Token *Token_Array;			/* to be filled by Malloc() */
 static size_t tk_size;			/* size of Token_Array[] */
@@ -21,7 +21,7 @@ static size_t tk_free;			/* next free position in Token_Array[]*/
 void
 Init_Token_Array(void) {
 	if (Token_Array) Free(Token_Array);
-	tk_size = TK_START;
+	tk_size = Initial_Token_Array_Size;
 	Token_Array = (Token *)Malloc(sizeof (Token) * tk_size);
 	tk_free = 1;		/* don't use position 0 */
 }
@@ -41,13 +41,20 @@ Store_Token(Token tk) {
 
 		if (!new_array) {
 			/* we failed */
-			fatal("out of memory");
+			fatal("out of memory: too much text");
 		}
 		Token_Array = new_array, tk_size = new_size;
 	}
 
 	/* now we are sure there is room enough */
 	Token_Array[tk_free++] = tk;
+}
+
+void
+Free_Token_Array(void) {
+	if (Token_Array) {
+		Free(Token_Array); Token_Array = 0;
+	}
 }
 
 size_t

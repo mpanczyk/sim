@@ -1,6 +1,6 @@
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: lang.h,v 1.8 2013-04-28 16:30:41 dick Exp $
+	$Id: lang.h,v 1.9 2016-04-27 19:09:48 dick Exp $
 */
 
 /*
@@ -11,11 +11,12 @@
 */
 
 /*
-	The abstract module 'lang' provides access to the lowest-level
-	token routines and data.
-	The actual implementation derives from one of the *lang.l files.
+	The abstract module 'lang' declares the names that provide access to
+	the lowest-level token routines and data.
+	The corresponding definitions must be provided by the *lang.l file.
 
-	There is a dummy implementation lang.c.
+	There is a dummy implementation lang.c, to satisfy the module
+	consistency checker check-ch.
 */
 
 extern FILE *yyin;

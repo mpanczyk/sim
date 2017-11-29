@@ -1,13 +1,19 @@
-
-- don't aiso and sortlist do the same thing?
+- tx_pos is a pig. struct texts are in principle immutable objects, except that
+  lists of positions are attached to it. These lists (and that is the root of
+  the problem )are accessed from two points, one in pass2 to fill in NL
+  positions and in pass3 to report them. This makes it impossible to write
+  const struct text in most places. Maybe there should be a superstruct
+  struct super_text {
+  	 const struct *st_text;
+	 struct position *st_pos;
+  }
+  Not elegant either.
 
 - some size_t are sizes, others are positions, indexes
 
 - start,limit -> start,length
 
 - Bool.h
-
-- min_run_string, thresh.. = clean up sim.[ch]
 
 - report runs as '... <matching text only> ...' (proper name for Retrieve_Runs())
 
@@ -72,9 +78,6 @@ Rejected ================================================================
 X remove Miranda
 X Mon Apr 11 13:23:41 1994: sim_orca
 X Thu May 13 23:02:46 1993: sim ook voor C++ en Ada
-
-X plug memory leaks (and still report memory usage with -M!)
-  not worth the effort
 
 X db_ not protected by #ifdef but by compilation to a call to an (empty) routine
   1. not conspicuous enough in the code; 2. impairs efficiency

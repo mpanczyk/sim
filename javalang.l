@@ -1,7 +1,7 @@
 %{
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: javalang.l,v 1.14 2013-04-28 16:30:41 dick Exp $
+	$Id: javalang.l,v 1.16 2017-03-19 09:23:19 dick Exp $
 */
 
 /*
@@ -158,6 +158,8 @@ const Token Closers[] = {
 
 /* Language-dependent code */
 
+const char *Subject = "Java programs";
+
 void
 Init_Language(void) {
 	Init_Algol_Language(Non_Finals, Non_Initials, Openers, Closers);
@@ -181,14 +183,14 @@ Best_Run_Size(const Token *str, size_t size) {
 %Start	Comment
 
 Layout		([ \t\r\f])
-ASCII95		([- !"#$%&'()*+,./0-9:;<=>?@A-Z\[\\\]^_`a-z{|}~])
+ASCII95		([\040-\176])
 
 Digit		([0-9a-fA-F])
 
 UniCode		(\\u{Digit}{Digit}{Digit}{Digit})
 AnyQuoted	((\\.)|{UniCode})
-StrChar		([^"\n\\]|{AnyQuoted})
-ChrChar		([^'\n\\]|{AnyQuoted})
+StrChar		([^\"\n\\]|{AnyQuoted})
+ChrChar		([^\'\n\\]|{AnyQuoted})
 
 StartComment	("/*")
 EndComment	("*/")

@@ -1,6 +1,6 @@
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: token.h,v 2.12 2012-06-08 16:04:30 dick Exp $
+	$Id: token.h,v 2.13 2017-02-04 16:58:54 dick Exp $
 */
 
 /*
@@ -38,7 +38,7 @@
 #ifndef	_TOKEN_H
 #define	_TOKEN_H
 
-#ifdef	lint
+#ifdef	lint_test
 /* For security we want to distinguish tokens from integers. Lint is not
    good at this, so for checking we use a pointer to a weird data type
 */
@@ -46,7 +46,7 @@ struct for_lint_only {int i;};
 typedef struct for_lint_only *Token;
 #else	/* if normal */
 typedef unsigned short Token;
-#endif	/* lint/normal */
+#endif	/* lint_test/normal */
 
 #define	N_TOKENS		(1<<16)
 #define	N_REGULAR_TOKENS	(1<<9)

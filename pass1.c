@@ -1,6 +1,6 @@
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: pass1.c,v 2.27 2015-01-14 16:47:27 dick Exp $
+	$Id: pass1.c,v 2.35 2016-07-29 12:50:02 dick Exp $
 */
 
 #include	<stdio.h>
@@ -12,7 +12,6 @@
 #include	"token.h"
 #include	"tokenarray.h"
 #include	"lang.h"
-#include	"error.h"
 #include	"options.h"
 #include	"pass1.h"
 
@@ -23,7 +22,7 @@ static void db_print_text(const struct text *);
 static void fprint_count(FILE *f, size_t cnt, const char *);
 
 void
-Read_Input_Files(int argc, const char *argv[], int round /* about printing */) {
+Read_Input_Files(int argc, const char *argv[]) {
 	int n;
 
 	Init_Text(argc);
@@ -37,7 +36,7 @@ Read_Input_Files(int argc, const char *argv[], int round /* about printing */) {
 		const char *fname = argv[n];
 		struct text *txt = &Text[n];
 
-		if (round == 1 && !is_set_option('T')) {
+		if (!is_set_option('T')) {
 			fprintf(Output_File, "File %s: ", fname);
 		}
 
@@ -45,18 +44,30 @@ Read_Input_Files(int argc, const char *argv[], int round /* about printing */) {
 		txt->tx_pos = 0;
 		txt->tx_start = Token_Array_Length();
 		txt->tx_limit = Token_Array_Length();
+
 		if (is_new_old_separator(fname)) {
-			if (round == 1 && !is_set_option('T')) {
-				fprintf(Output_File, "separator\n");
+			if (!is_set_option('T')) {
+				fprintf(Output_File, "new/old separator\n");
 			}
-			Number_of_New_Texts = n;
+			if (Number_of_New_Texts == Number_of_Texts) {
+				Number_of_New_Texts = n;
+			} else fatal("more than one new/old separator");
 		}
 		else {
-			if (!Open_Text(First_Pass, txt)) {
-				if (round == 1 && !is_set_option('T')) {
-					fprintf(Output_File,
-						">>>> cannot open <<<< ");
+			int file_opened = 0;
+			if (Open_Text(First_Pass, txt)) {
+				file_opened = 1;
+			} else {
+				/* print a warning */
+				if (is_set_option('T')) {
+					/* the file name has not yet been
+					   printed; print it now
+					*/
+					fprintf(Output_File, "File %s: ",
+						fname);
 				}
+				fprintf(Output_File,
+					">>>> cannot open <<<<\n");
 				/*	the file has still been opened
 					with a null file for uniformity
 				*/
@@ -72,10 +83,10 @@ Read_Input_Files(int argc, const char *argv[], int round /* about printing */) {
 				Token_EQ(lex_token, End_Of_Line);
 
 			/* report */
-			if (round == 1 && !is_set_option('T')) {
+			if (file_opened && !is_set_option('T')) {
 				fprint_count(Output_File,
 					     txt->tx_limit - txt->tx_start,
-					     token_name
+					     Token_Name
 				);
 				fprintf(Output_File, ", ");
 				fprint_count(Output_File,
@@ -105,12 +116,19 @@ Read_Input_Files(int argc, const char *argv[], int round /* about printing */) {
 	}
 
 	/* report total */
-	if (round == 1 && !is_set_option('T')) {
-		fprintf(Output_File, "Total: ");
-		fprint_count(Output_File, Token_Array_Length() - 1, token_name);
-		fprintf(Output_File, "\n\n");
-		fflush(Output_File);
-	}
+	int sep_present = (Number_of_Texts != Number_of_New_Texts);
+	fprintf(Output_File, "Total input: ");
+	fprint_count(Output_File,
+		     (!sep_present ? Number_of_Texts : Number_of_Texts - 1),
+		     "file"
+	);
+	fprintf(Output_File, " (%d new, %d old), ",
+		Number_of_New_Texts,
+		(!sep_present ? 0 :  Number_of_Texts - Number_of_New_Texts - 1)
+	);
+	fprint_count(Output_File, Token_Array_Length() - 1, Token_Name);
+	fprintf(Output_File, "\n\n");
+	fflush(Output_File);
 }
 
 static void
@@ -133,7 +151,7 @@ db_print_text(const struct text *txt) {
 	fprintf(Debug_File, "File \"%s\", %s %ss, ",
 		txt->tx_fname,
 		size_t2string(txt->tx_limit - txt->tx_start),
-		token_name
+		Token_Name
 	);
 	fprintf(Debug_File, "txt->tx_start = %s, txt->tx_limit = %s\n",
 		size_t2string(txt->tx_start),

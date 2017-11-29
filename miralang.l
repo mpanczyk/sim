@@ -1,7 +1,7 @@
 %{
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: miralang.l,v 1.11 2013-04-28 16:30:41 dick Exp $
+	$Id: miralang.l,v 1.13 2017-03-19 09:23:20 dick Exp $
 */
 
 /*
@@ -71,6 +71,8 @@ const Token Closers[] = {
 
 /* Language-dependent code */
 
+const char *Subject = "Miranda programs";
+
 void
 Init_Language(void) {
 	Init_Algol_Language(Non_Finals, Non_Initials, Openers, Closers);
@@ -94,13 +96,13 @@ Best_Run_Size(const Token *str, size_t size) {
 %Start	Comment
 
 Layout		([ \t\r\f])
-ASCII95		([- !"#$%&'()*+,./0-9:;<=>?@A-Z\[\\\]^_`a-z{|}~])
+ASCII95		([\040-\176])
 
 AnyQuoted	(\\.)
-StrChar		([^"\n\\]|{AnyQuoted})
-ChrChar		([^'\\]|{AnyQuoted})
+StrChar		([^\"\n\\]|{AnyQuoted})
+ChrChar		([^\'\\]|{AnyQuoted})
 
-Idf		([A-Za-z][A-Za-z0-9_']*)
+Idf		([A-Za-z][A-Za-z0-9_\']*)
 
 %%
 

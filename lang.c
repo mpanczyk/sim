@@ -1,6 +1,6 @@
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: lang.c,v 2.8 2014-01-27 20:50:51 dick Exp $
+	$Id: lang.c,v 2.9 2016-05-13 19:00:52 dick Exp $
 */
 
 /*
@@ -30,6 +30,7 @@ yylex(void) {
 	(void)Best_Algol_Run_Size(0, 0);
 	(void)idf_in_list(0, 0, 0, 0);
 	(void)idf_hashed(0);
+	(void)lower_case(0);
 #endif
 	return 0;
 }

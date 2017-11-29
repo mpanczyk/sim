@@ -1,6 +1,6 @@
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: add_run.h,v 1.4 2013-04-28 16:30:39 dick Exp $
+	$Id: add_run.h,v 1.5 2016-04-10 09:11:11 dick Exp $
 */
 
 /*	Interface between front-end and back-end: all information about
@@ -8,6 +8,9 @@
 	each identified by their struct text and the position of the common
 	segment in Token_Array[], and the number of tokens in the common
 	segment.
+
+	The routine add_run() constructs a run with the given properties and
+	adds it to 'runs.[ch]' or 'percentages.[ch]'.
 */
 
 extern void add_run(

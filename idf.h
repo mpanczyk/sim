@@ -1,10 +1,15 @@
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: idf.h,v 2.12 2015-01-17 10:20:40 dick Exp $
+	$Id: idf.h,v 2.13 2016-07-31 18:55:44 dick Exp $
 */
 
 /*	Idf module:
-	Token idf_in_list(char *str, struct idf l[], sizeof l, Token dflt);
+	Token idf_in_list(
+		const char *str,
+		const struct idf list[],
+		size_t listsize,
+		Token default_token
+	);
 		looks up a keyword in a list of keywords l, represented as an
 		array of struct idf, and returns its translation as a token;
 		dflt is returned if the keyword is not found.

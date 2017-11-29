@@ -1,6 +1,6 @@
 /*	This file is part of the auxiliaries library.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: ForEachFile.c,v 1.19 2014-07-28 09:18:11 Gebruiker Exp $
+	$Id: ForEachFile.c,v 1.23 2016-02-22 08:20:42 Gebruiker Exp $
 */
 
 #include	<string.h>
@@ -11,7 +11,7 @@
 
 #include	"ForEachFile.h"
 
-/*Library module source prelude */
+/* Library module source prelude */
 #undef	_FOREACHFILE_CODE_
 #ifndef	lint
 #define	_FOREACHFILE_CODE_
@@ -24,39 +24,6 @@
 
 /* Library module source code */
 
-							/* LOOP DETECTION */
-struct ino_link {
-	struct ino_link *next;
-	long il_ino;
-	long il_device;
-};
-
-static int
-in_ino_list(const struct ino_link *inop, const struct stat *st) {
-	while (inop) {
-#ifdef	UNIX
-		if (	inop->il_ino == st->st_ino
-		&&	inop->il_device == st->st_dev
-		)	return 1;
-#else
-#ifdef	lint
-		st = st;
-#endif
-#endif
-		inop = inop->next;
-	}
-	return 0;
-}
-
-static void
-link_ino_list(
-    struct ino_link *inop, struct ino_link *ninop, const struct stat *st
-) {
-	ninop->next = inop;
-	ninop->il_ino = st->st_ino;
-	ninop->il_device = st->st_dev;
-}
-
 							/* TREE SCANNING */
 #ifdef	S_IFLNK				/* system with symbolic links */
 #define	LSTAT	lstat
@@ -64,174 +31,124 @@ link_ino_list(
 #define	LSTAT	Stat
 #endif	/* S_IFLNK */
 
+int
+is_dirstat(const struct stat *fs) {
+	if (!fs) return 0;
+	return ((fs->st_mode & S_IFMT) == S_IFDIR);
+}
+
+int
+is_Dirname(const Fchar *Fn) {
+	if (!Fn) return 0;
+	struct stat stb;
+	if (LSTAT(Fn, &stb) < 0) return 0;
+	return ((stb.st_mode & S_IFMT) == S_IFDIR);
+}
+
+int
+is_Admin_Dirname(const Fchar *Fn) {
+	if (!Fn) return 0;
+	return	Fnamecmp(Fn, str2Fname(".")) == 0
+	||	Fnamecmp(Fn, str2Fname("..")) == 0;
+}
+
+static void do_dir(
+	Fchar *Fn,
+	int (*proc)(const Fchar *, const char *, const struct stat *)
+);
+
 static void
-do_FEF(
-	Fchar *fn,
-	void (*proc)(const Fchar *, const char *, const struct stat *),
-	int dev,
-	struct ino_link *inop,
-	Fchar separator,
-	int max_depth
+do_name(Fchar *Fn,
+	int (*proc)(const Fchar *, const char *, const struct stat *),
+	int top_level
 ) {
+	/* examine Fn */
 	struct stat fs;
-	Dir_t *dir;
-
-	if (proc == 0) return;		/* just make sure */
-
-	if (LSTAT(fn, &fs) < 0) {
-		(*proc)(fn, strerror(errno), &fs);
+	if (LSTAT(Fn, &fs) < 0) {
+		(void)(*proc)(Fn, strerror(errno), 0);
 		return;
 	}
 
-	/* report on file fn */
-	(*proc)(fn, (char*)0, &fs);
+	/* report on Fn and get possible return code */
+	int rc = (*proc)(Fn, (char*)0, &fs);
 
-	if (max_depth == 0) return;
-	if ((fs.st_mode & S_IFMT) != S_IFDIR) return;
+	if (!is_dirstat(&fs)) return;
+
+	/* Fn is a directory, so rc may be meaningful */
+	if (!top_level) if (!rc) return;
 
 #ifdef	S_IFLNK
 	/* don't follow links */
 	if ((fs.st_mode & S_IFMT) == S_IFLNK) return;
 #endif
 
-	/* treat directory */
-	if (dev < 0) {
-		/* no device known yet */
-		dev = fs.st_dev;
-	}
-	if (fs.st_dev != dev) {
-		return;
-	}
-
-	dir = Opendir(fn);
-	if (dir == 0) {
-		(*proc)(fn, "directory not readable", &fs);
-	}
-	else {
-		/* scan new directory */
-		int fnl = Fnamelen(fn);
-		Dirent_t *dent;
-		struct ino_link ino;
-
-		/* worry about loops in the file system */
-		if (in_ino_list(inop, &fs)) {
-			(*proc)(fn, "loop in file system", &fs);
-			Closedir(dir);
-			return;
-		}
-		link_ino_list(inop, &ino, &fs);
-
-		/* shape up the directory name */
-		if (fn[fnl-1] != separator) {
-			/* append separator */
-			fn[fnl++] = separator;
-			fn[fnl] = '\0';
-		}
-
-		/* descend */
-		while ((dent = Readdir(dir)) != (Dirent_t *)0) {
-			if (	Fnamecmp(dent->d_name, str2Fname(".")) == 0
-				||	Fnamecmp(dent->d_name, str2Fname("..")) == 0
-			)	continue;
-
-			if (Fnamecmp(dent->d_name, str2Fname("")) == 0) {
-				(*proc)(fn,
-					"directory contains empty file name",
-					&fs
-				);
-				continue;
-			}
-
-			/* append name */
-			Fnamecat(fn, dent->d_name);
-			do_FEF(fn, proc, dev, &ino, separator, max_depth-1);
-			/* remove name again*/
-			fn[fnl] = '\0';
-		}
-		Closedir(dir);
-	}
-}
-
-static Fchar
-get_separator(const Fchar *fn) {
-#ifndef	MSDOS
-	(void)(fn);			/* use fn */
-	return '/';
-#else
-	/* under MSDOS, conform to user's use, or use '\' */
-	Fchar sep = 0;
-
-	while (*fn) {
-		if (*fn == '/' || *fn == '\\') {
-			if (sep == 0) {
-				sep = *fn;
-			}
-			else
-			if (sep != *fn) return 0;	/* bad mixed use */
-		}
-		fn++;
-	}
-	return (sep ? sep : '\\');
-#endif
+	do_dir(Fn, proc);
 }
 
 static void
-clean_name(Fchar *fn, Fchar sep) {
-	Fchar *f1 = fn;
-	Fchar *f2 = fn;
-
-	/* remove multiple separators */
-	while (*f1) {
-		if (*f1 == sep && *(f1+1) == sep) {
-			f1++;
-		} else {
-			*f2++ = *f1++;
-		}
-	}
-	*f2 = '\0';
-
-	/* remove a trailing separator */
-	if (f2-1 > fn && *(f2-1) == sep) {
-		*(f2-1) = '\0';
-	}
-}
-
-static void
-do_ForEachFile(
-	const Fchar *fn,
-	void (*proc)(const Fchar *, const char *, const struct stat *),
-	int max_depth
+do_dir(
+	Fchar *Fn,
+	int (*proc)(const Fchar *, const char *, const struct stat *)
 ) {
-	Fchar fname[MAX_FILE_NAME_LENGTH];
-	Fchar separator;
 
-	Fnamecpy(fname, (!fn || !*fn) ? str2Fname(".") : fn);
-	separator = get_separator(fname);
-	if (!separator) {
-		(*proc)(fname, "both / and \\ used as separators", 0);
+	/* treat directory */
+	Dir_t *dir = Opendir(Fn);
+	if (dir == 0) {
+		(void)(*proc)(Fn, "directory not readable", 0);
 		return;
 	}
 
-	clean_name(fname, separator);
-	do_FEF(fname, proc, -1, (struct ino_link *)0, separator, max_depth);
+	/* scan new directory */
+
+	/* append separator */
+	int Fn_len = Fnamelen(Fn);
+	Fn[Fn_len++] = '/';
+	Fn[Fn_len] = '\0';
+
+	/* descend */
+	Dirent_t *dent;
+	while ((dent = Readdir(dir)) != (Dirent_t *)0) {
+		const Fchar *d_name = dent->d_name;
+		if (is_Admin_Dirname(d_name)) continue;
+
+		/* append name */
+		Fnamecat(Fn, d_name);
+		do_name(Fn, proc, 0);
+		/* remove appended name*/
+		Fn[Fn_len] = '\0';
+	}
+	/* remove appended separator*/
+	Fn[--Fn_len] = '\0';
+	Closedir(dir);
+}
+
+static MSDOS_sep = (Fchar)'\\';
+static UNIX_sep = (Fchar)'/';
+
+static void
+clean_name(Fchar *Fn) {
+	/* remove a trailing separator */
+	int Fn_len = Fnamelen(Fn);
+	if (Fn_len > 1 && (Fn[Fn_len-1] == MSDOS_sep || Fn[Fn_len-1] == UNIX_sep)) {
+		Fn[Fn_len-1] = '\0';
+	}
 }
 
 							/* THE ENTRIES */
 void
 ForEachFile(
-	const Fchar *fn,
-	void (*proc)(const Fchar *, const char *, const struct stat *)
+	const Fchar *Fname,
+	int (*proc)(const Fchar *, const char *, const struct stat *)
 ) {
-	do_ForEachFile(fn, proc, -1);	/* infinitely deep */
-}
+	if (!Fname || !Fname[0] || !proc) return;	/* just to make sure */
 
-void
-ForEachLocalFile(
-	const Fchar *fn,
-	void (*proc)(const Fchar *, const char *, const struct stat *),
-	int depth
-) {
-	do_ForEachFile(fn, proc, depth);
+	/* get Fn */
+	Fchar Fn[MAX_FILE_NAME_LENGTH];
+	Fnamecpy(Fn, Fname);
+	clean_name(Fn);
+
+	/* top level */
+	do_name(Fn, proc, 1);
 }
 
 /* End library module source code */
@@ -240,8 +157,10 @@ ForEachLocalFile(
 #ifdef	lint
 static void
 satisfy_lint(void *x) {
+	(void)is_dirstat(0);
+	(void)is_Dirname(0);
+	(void)is_Admin_Dirname(0);
 	ForEachFile(0, 0);
-	ForEachLocalFile(0, 0, 0);
 	satisfy_lint(x);
 }
 #endif	/* lint */

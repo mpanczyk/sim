@@ -1,10 +1,10 @@
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: algollike.c,v 2.10 2013-04-28 16:30:40 dick Exp $
+	$Id: algollike.c,v 2.11 2016-05-13 19:00:51 dick Exp $
 */
 
+#include	"sim.h"
 #include	"options.h"
-#include	"error.h"
 #include	"token.h"
 #include	"algollike.h"
 

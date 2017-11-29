@@ -1,19 +1,18 @@
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: pass3.c,v 2.22 2014-01-26 21:52:59 dick Exp $
+	$Id: pass3.c,v 2.31 2016-07-31 18:55:44 dick Exp $
 */
 
 #include	<stdio.h>
 #include	<string.h>
 
 #include	"system.par"
+#include	"settings.par"
 #include	"debug.par"
 #include	"sim.h"
 #include	"text.h"
 #include	"token.h"
 #include	"runs.h"
-#include	"Malloc.h"
-#include	"error.h"
 #include	"options.h"
 #include	"pass3.h"
 #include	"percentages.h"
@@ -23,49 +22,60 @@
 static void db_run(const struct run *);
 #endif
 
+/* Positioning of UTF-8 characters must be done with a finer grain than just
+   10 Courier characters to the inch. On the other hand we do not know the
+   exact width of each UNICODE character, so whatever we do is an approximation.
+   We use a granularity of 1 pt and a font size of 10 pts.
+
+   Since C does not have type-checked integer subtypes, we put the the fact
+   that they handle UTF-8 chars in the variable and routine names to avoid
+   errors.
+*/
+typedef int pts;
+#define	FONT_SIZE	(10)
+
 static FILE *open_chunk(const struct chunk *);
-static void fill_line(FILE *, char []);
-static void clear_line(char []);
+static void print_char(char);
+static void print_spaces(int);
+static pts print_UTF8_line(FILE *);
+static pts print_UTF8_char(int ch, FILE *);
+static void print_UTF8_spaces(pts);
 static void show_run(const struct run *);
-static void show_2C_line(const char [], const char []);
 static void show_1C_line(FILE *, const char *);
-static int pr_head(const struct chunk *);
-static int prs(const char *);
-static int pru(size_t);
-static int unslen(size_t);
+static int print_header(const struct chunk *);
+static int print_string(const char *);
+static int print_size_t(size_t);
+static int length_size_t(size_t);
 
 static int max_line_length;		/* Actual maximum line length */
-static char *line0;			/* by Malloc() */
-static char *line1;
+static pts max_line_length_UTF8;
 
 void
 Show_Runs(void) {
-	AisoIter iter;
-	struct run *run;
-
 #ifdef	DB_RUN
 	fprintf(Debug_File, "Starting Show_Runs()\n");
 #endif	/* DB_RUN */
-	max_line_length = Page_Width / 2 - 2;
-	line0 = Malloc((size_t)(max_line_length + 1) * sizeof (char));
-	line1 = Malloc((size_t)(max_line_length + 1) * sizeof (char));
+	const struct run *run = /*ZZ*/
+		(is_set_option('u') ? unsorted_runs() : sorted_runs());
 
-	OpenIter(&iter);
-	while (GetAisoItem(&iter, &run)) {
+	while (run) {
 #ifdef	DB_RUN
 		db_run(run);
 #endif	/* DB_RUN */
 		show_run(run);
-		fprintf(Output_File, "\n");
+		print_char('\n');
+		fflush(Output_File);
+		run = run->rn_next;
 	}
-	CloseIter(&iter);
 
-	Free(line0); line0 = 0;
-	Free(line1); line1 = 0;
+	discard_runs();
 }
 
 static void
 show_run(const struct run *run) {
+	max_line_length = Page_Width / 2 - 1;
+	max_line_length_UTF8 = max_line_length * FONT_SIZE;
+
 	/* The animals came in two by two ... */
 	const struct chunk *cnk0 = &run->rn_chunk0;
 	const struct chunk *cnk1 = &run->rn_chunk1;
@@ -78,24 +88,19 @@ show_run(const struct run *run) {
 	if (!is_set_option('d')) {
 		/* no assumptions about the lengths of the file names! */
 		size_t size = run->rn_size;
-		int pos = 0;
-
-		pos += pr_head(cnk0);
-		while (pos < max_line_length + 1) {
-			pos += prs(" ");
-		}
-		pos += prs("|");
-		pos += pr_head(cnk1);
-		while (pos < 2*max_line_length - unslen(size)) {
-			pos += prs(" ");
-		}
+		int pos = print_header(cnk0);
+		print_spaces(max_line_length - pos);
+		print_char('|');
+		pos = print_header(cnk1);
+		print_spaces(max_line_length - pos - length_size_t(size) - 2);
 		fprintf(Output_File, "[%s]\n", size_t2string(size));
 	}
 	else {
-		(void)pr_head(cnk0);
-		fprintf(Output_File, "\n");
-		(void)pr_head(cnk1);
-		fprintf(Output_File, "\n");
+		/* diff-like format */
+		(void)print_header(cnk0);
+		print_char('\n');
+		(void)print_header(cnk1);
+		print_char('\n');
 	}
 
 	/* stop if that suffices */
@@ -108,31 +113,28 @@ show_run(const struct run *run) {
 
 	/* display the chunks in the required format */
 	if (!is_set_option('d')) {
-		/* fill 2-column lines and print them */
+		/* print 2-column format */
 		while (nl_cnt0 != 0 || nl_cnt1 != 0) {
+			int pos_UTF8 = 0;
 			if (nl_cnt0) {
-				fill_line(f0, line0);
+				pos_UTF8 = print_UTF8_line(f0);
 				nl_cnt0--;
 			}
-			else {
-				clear_line(line0);
-			}
+			print_UTF8_spaces(max_line_length_UTF8 - pos_UTF8);
+			print_char('|');
 			if (nl_cnt1) {
-				fill_line(f1, line1);
+				(void)print_UTF8_line(f1);
 				nl_cnt1--;
 			}
-			else {
-				clear_line(line1);
-			}
-			show_2C_line(line0, line1);
+			print_char('\n');
 		}
 	}
 	else {
-		/* display the lines in a diff(1)-like format */
+		/* display the chunks in a diff(1)-like format */
 		while (nl_cnt0--) {
 			show_1C_line(f0, "<");
 		}
-		fprintf(Output_File, "---\n");
+		(void)print_string("---\n");
 		while (nl_cnt1--) {
 			show_1C_line(f1, ">");
 		}
@@ -144,31 +146,31 @@ show_run(const struct run *run) {
 }
 
 static int
-pr_head(const struct chunk *cnk) {
+print_header(const struct chunk *cnk) {
 	int pos = 0;
 
-	pos += prs(cnk->ch_text->tx_fname);
-	pos += prs(": line ");
-	pos += pru(cnk->ch_first.ps_nl_cnt);
-	pos += prs("-");
-	pos += pru(cnk->ch_last.ps_nl_cnt - 1);
+	pos += print_string(cnk->ch_text->tx_fname);
+	pos += print_string(": line ");
+	pos += print_size_t(cnk->ch_first.ps_nl_cnt);
+	pos += print_string("-");
+	pos += print_size_t(cnk->ch_last.ps_nl_cnt - 1);
 	return pos;
 }
 
 static int
-prs(const char *str) {
+print_string(const char *str) {
 	fprintf(Output_File, "%s", str);
 	return (int) strlen(str);
 }
 
 static int
-pru(size_t u) {
+print_size_t(size_t u) {
 	fprintf(Output_File, "%s", size_t2string(u));
-	return unslen(u);
+	return length_size_t(u);
 }
 
 static int
-unslen(size_t u) {
+length_size_t(size_t u) {
 	int res = 1;
 
 	while (u > 9) {
@@ -206,14 +208,13 @@ open_chunk(const struct chunk *cnk) {
 	return f;
 }
 
-static void
-fill_line(FILE *f, char ln[]) {
-	/*	Reads one line from f and puts it in condensed form in ln.
-	*/
-	int indent = 0, lpos = 0;
+static pts
+print_UTF8_line(FILE *f) {
+	/* Reads one line from f and prints it in condensed form. */
+	int indent = 0, pos_UTF8 = 0;
 	int ch;
 
-	/* condense and skip initial blank */
+	/* condense initial blanks */
 	while ((ch = getc(f)), ch == ' ' || ch == '\t') {
 		if (ch == '\t') {
 			indent = 8;
@@ -223,52 +224,66 @@ fill_line(FILE *f, char ln[]) {
 		}
 		if (indent == 8) {
 			/* every eight blanks give one blank */
-			if (lpos < max_line_length) {
-				ln[lpos++] = ' ';
+			if (pos_UTF8 < max_line_length_UTF8) {
+				pos_UTF8 += print_UTF8_char(' ', 0);
 			}
 			indent = 0;
 		}
 	}
 
-	/* store the rest */
+	/* print the rest */
 	while (ch >= 0 && ch != '\n') {
 		if (ch == '\t') {
 			/* replace tabs by blanks */
 			ch = ' ';
 		}
-		if (lpos < max_line_length) {
-			ln[lpos++] = (char) ch;
+		if (pos_UTF8 < max_line_length_UTF8) {
+			pos_UTF8 += print_UTF8_char(ch, f);
 		}
 		ch = getc(f);
 	}
-	ln[lpos] = '\0';		/* always room for this one */
+	return pos_UTF8;
 }
 
 static void
-clear_line(char ln[]) {
-	/* a simple null byte will suffice */
-	ln[0] = '\0';
+print_char(char ch) {
+	fprintf(Output_File, "%c", ch);
 }
 
 static void
-show_2C_line(const char ln0[], const char ln1[]) {
-	/*	displays the contents of the two lines in a two-column
-		format
-	*/
-	int i;
+print_spaces(int n) {
+	while (n > 0) {
+		print_char(' '), --n;
+	}
+}
 
-	for (i = 0; i < max_line_length && ln0[i] != '\0'; i++) {
-		fputc(ln0[i], Output_File);
-	}
-	for (; i < max_line_length; i++) {
-		fputc(' ', Output_File);
-	}
-	fprintf(Output_File, " |");
+static pts
+print_UTF8_char(int ch, FILE *f) {
+	int pos_UTF8 = FONT_SIZE;
+	fprintf(Output_File, "%c", ch);
+	if (ch < 192) return pos_UTF8;
 
-	for (i = 0; i < max_line_length && ln1[i] != '\0'; i++) {
-		fputc(ln1[i], Output_File);
+	while (ch & 0x40) {
+		int ch1 = getc(f);
+		fprintf(Output_File, "%c", ch1);
+		if ((ch1 & 0xC0) != 0x80) {
+			/* bad UTF-8 */
+			return pos_UTF8;	/* no recovery */
+		}
+		pos_UTF8 += 4;
+		/* ^ Stupid heuristic: the longer the UTF sequence, the bigger
+		   the character. Rough, but the best we can reasonably do.
+		*/
+		ch <<= 1;
 	}
-	fprintf(Output_File, "\n");
+	return pos_UTF8;
+}
+
+static void
+print_UTF8_spaces(pts n) {
+	while (n > 0) {
+		print_char(' '), n -= FONT_SIZE;
+	}
 }
 
 static void
@@ -277,11 +292,11 @@ show_1C_line(FILE *f, const char *marker) {
 	*/
 	int ch;
 
-	fprintf(Output_File, "%s", marker);
+	fprintf(Output_File, "%s ", marker);
 	while ((ch = getc(f)), ch > 0 && ch != '\n') {
-		fputc(ch, Output_File);
+		print_char(ch);
 	}
-	fputc('\n', Output_File);
+	print_char('\n');
 }
 
 #ifdef	DB_RUN

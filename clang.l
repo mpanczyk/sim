@@ -1,7 +1,7 @@
 %{
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: clang.l,v 2.20 2013-04-28 16:30:40 dick Exp $
+	$Id: clang.l,v 2.22 2017-03-19 09:23:19 dick Exp $
 */
 
 /*
@@ -141,6 +141,8 @@ static const Token Closers[] = {
 
 /* Language-dependent code */
 
+const char *Subject = "C programs";
+
 void
 Init_Language(void) {
 	Init_Algol_Language(Non_Finals, Non_Initials, Openers, Closers);
@@ -164,11 +166,11 @@ Best_Run_Size(const Token *str, size_t size) {
 %Start	Comment
 
 Layout		([ \t\r\f])
-ASCII95		([- !"#$%&'()*+,./0-9:;<=>?@A-Z\[\\\]^_`a-z{|}~])
+ASCII95		([\040-\176])
 
 AnyQuoted	(\\.)
-StrChar		([^"\n\\]|{AnyQuoted})
-ChrChar		([^'\n\\]|{AnyQuoted})
+StrChar		([^\"\n\\]|{AnyQuoted})
+ChrChar		([^\'\n\\]|{AnyQuoted})
 
 StartComment	("/*")
 EndComment	("*/")

@@ -1,6 +1,6 @@
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: text.h,v 1.7 2015-01-12 09:16:13 dick Exp $
+	$Id: text.h,v 1.9 2016-07-28 07:00:48 dick Exp $
 */
 
 /*	Implements the access to the lexical scanner.
@@ -38,7 +38,10 @@ struct position {
 };
 
 extern struct text *Text;		/* Text[], one for each input file */
-extern int Number_of_Texts;		/* number of text files */
+extern int Number_of_Texts;		/* number of text files;
+					   this includes the new/old separator
+					   if present; actually a design flaw ZZ
+					*/
 extern int Number_of_New_Texts;		/* number of new text files */
 
 extern void Init_Text(int nfiles);
@@ -47,6 +50,7 @@ extern int Open_Text(enum Pass pass, struct text *txt);
 extern int Next_Text_Token_Obtained(void);
 extern int Next_Text_EOL_Obtained(void);
 extern void Close_Text(enum Pass pass, struct text *txt);
+extern void Free_Text(void);
 
 #ifdef	DB_NL_BUFF
 extern void db_print_nl_buff(size_t start, size_t limit);

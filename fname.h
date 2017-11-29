@@ -1,6 +1,6 @@
 /*	This file is part of the auxiliaries library.
-	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: fname.h,v 1.12 2014-07-28 09:18:12 Gebruiker Exp $
+	Written by Dick Grune, dick@dickgrune.com
+	$Id: fname.h,v 1.13 2017-01-22 14:50:00 Gebruiker Exp $
 */
 
 /*	Support for UNICODE file names */

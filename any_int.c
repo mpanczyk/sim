@@ -1,6 +1,6 @@
 /*	This file is part of the module ANY_INT.
-	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: any_int.c,v 1.3 2014-07-28 09:18:11 Gebruiker Exp $
+	Written by Dick Grune, dick@dickgrune.com
+	$Id: any_int.c,v 1.4 2017-01-22 14:50:00 Gebruiker Exp $
 */
 
 #include	"any_int.h"

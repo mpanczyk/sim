@@ -1,6 +1,6 @@
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: sim.c,v 2.45 2015-04-29 18:18:22 dick Exp $
+	$Id: sim.c,v 2.69 2017-03-19 09:30:38 dick Exp $
 */
 
 #include	<stdio.h>
@@ -13,8 +13,8 @@
 #include	"options.h"
 #include	"newargs.h"
 #include	"token.h"
+#include	"tokenarray.h"
 #include	"language.h"
-#include	"error.h"
 #include	"text.h"
 #include	"runs.h"
 #include	"hash.h"
@@ -29,70 +29,56 @@
 #include	"Malloc.h"
 #include	"any_int.h"
 
-							/* VERSION */
-#if	0	/* set to 1 when experimenting */
-#undef	VERSION
-#define	VERSION	__TIMESTAMP__
-#endif
+const char *Version;
+
 							/* PARAMETERS */
-/* command-line parameters */
+/* Command-line parameters, with defaults */
 int Min_Run_Size = DEFAULT_MIN_RUN_SIZE;
 int Page_Width = DEFAULT_PAGE_WIDTH;
-int Threshold_Percentage = 1;		/* minimum percentage to show */
+int Threshold_Percentage = 1;
 FILE *Output_File;
 FILE *Debug_File;
 
-/* and their string values, for language files that define their own parameters
-*/
-const char *token_name = "token";
-const char *min_run_string;
-const char *threshold_string;
+/* Language-specific parameters; may be changed in Init_Language() */
+const char *Token_Name = "token";
 
-const char *progname;			/* for error reporting */
-
-static const char *page_width_string;
-static const char *output_name;		/* for reporting */
+static const char *progname;		/* for error reporting */
+static const char *output_name;		/* for redirecting the output */
 
 static const struct option optlist[] = {
-	{'r', "minimum run size", 'N', &min_run_string},
-	{'w', "page width", 'N', &page_width_string},
-	{'f', "function-like forms only", ' ', 0},
-	{'F', "keep function identifiers in tact", ' ', 0},
-	{'d', "use diff format for output", ' ', 0},
-	{'T', "terse output", ' ', 0},
-	{'n', "display headings only", ' ', 0},
-	{'p', "use percentage format for output", ' ', 0},
-	{'P', "use percentage format, main contributor only", ' ', 0},
-	{'t', "threshold level of percentage to show", 'N', &threshold_string},
-	{'e', "compare each file to each file separately", ' ', 0},
-	{'s', "do not compare a file to itself", ' ', 0},
-	{'S', "compare new files to old files only", ' ', 0},
-	{'R', "recurse into subdirectories", ' ', 0},
-	{'i', "read arguments (file names) from standard input", ' ', 0},
-	{'o', "write output to file F", 'F', &output_name},
-	{'v', "show version number and compilation date", ' ', 0},
-	{'M', "show memory usage info", ' ', 0},
-	{'-', "lexical scan output only", ' ', 0},
+	{'r', "set minimum run size to N", Number, &Min_Run_Size},
+
+	{' ', "output runs as text (default)", None, 0},
+	{'d', "output in a diff-like format", None, 0},
+	{'n', "suppress the text of the runs", None, 0},
+	{'T', "suppress reporting the input files", None, 0},
+	{'p', "output similarity in percentages", None, 0},
+	{'P', "main contributing file to percentages only", None, 0},
+	{'t', "threshold level of percentages", Number, &Threshold_Percentage},
+
+	{'e', "compare each file to each file separately", None, 0},
+
+	{' ', "compare a file to files after it only (default)", None, 0},
+	{'a', "compare to all files", None, 0},
+	{'S', "compare to old files only", None, 0},
+	{'s', "do not compare a file to itself", None, 0},
+
+	{' ', "sorted output, most significant first (default)", None, 0},
+	{'u', "unbuffered, unsorted output", None, 0},
+
+	{' ', "miscellaneous options:", None, 0},
+	{'f', "function-like forms only", None, 0},
+	{'F', "keep function identifiers in tact", None, 0},
+	{'R', "recurse into subdirectories", None, 0},
+	{'i', "read arguments (file names) from standard input", None, 0},
+	{'o', "write output to file F", String, &output_name},
+	{'w', "set page width to N", Number, &Page_Width},
+	{'O', "show command line options at start-up", None, 0},
+	{'M', "show memory usage info at close-down", None, 0},
+	{'v', "show version number and compilation date", None, 0},
+	{'-', "lexical scan output only", None, 0},
 	{0, 0, 0, 0}
 };
-
-static void
-allow_at_most_one_out_of(const char *opts) {
-	const char *first;
-	for (first = opts; *first; first++) {
-		const char *second;
-		for (second = first + 1; *second; second++) {
-			if (is_set_option(*first) &&is_set_option(*second)) {
-				char msg[256];
-				sprintf(msg,
-					"options -%c and -%c are incompatible",
-					*first, *second
-				);
-				fatal(msg);
-			}
-		}
-	}
-}
 
 							/* SERVICE ROUTINES */
 int
@@ -107,14 +93,13 @@ size_t2string(size_t s) {
 	return any_uint2string(s, 0);
 }
 
-							/* PROGRAM */
-static void
-read_and_compare_files(int argc, const char **argv, int round) {
-	Read_Input_Files(argc, argv, round);
-	Make_Forward_References();
-	Compare_Files();
-	Free_Forward_References();
+void
+fatal(const char *msg) {
+	fprintf(stderr, "%s: %s\n", progname, msg);
+	exit(1);
 }
+
+							/* PROGRAM */
 
 #ifdef	ARG_TEST
 static void
@@ -132,6 +117,17 @@ show_args(const char *msg, int argc, const char *argv[]) {
 int
 main(int argc, const char *argv[]) {
 
+	/* The value of Version derives from the macro VERSION in the
+	   Makefile if present. If not, a build time stamp is created.
+	*/
+	char version[40];
+#ifdef	VERSION
+	sprintf(version, "Version %s", VERSION);
+#else
+	sprintf(version, "Build %s, %s", __DATE__, __TIME__);
+#endif
+	Version = version;
+
 	/* Save program name */
 	progname = argv[0];
 	argv++, argc--;				/* and skip it */
@@ -139,50 +135,60 @@ main(int argc, const char *argv[]) {
 	/* Set the default output and debug streams */
 	Output_File = stdout;
 	Debug_File = stdout;
+	Threshold_Percentage = 1;
 
-	/* Get command line options */
-	{	int nop = do_options(progname, optlist, argc, argv);
-		argc -= nop, argv += nop;	/* and skip them */
+	/* Options, default string values given above */
+
+	/* override from language file */
+	Init_Language();
+
+	/* override from command line */
+	{	int n_op = do_options(progname, optlist, argc, argv);
+		argc -= n_op, argv += n_op;	/* and skip them */
 	}
 
 	/* Check options compatibility */
-	allow_at_most_one_out_of("dnpPT");
+	allow_at_most_one_option_out_of("dnp");	/* alternative output formats */
+	allow_at_most_one_option_out_of("aS");	/* alternative ranges */
+	allow_at_most_one_option_out_of("sS");	/* self is outside old files */
+
 	if (is_set_option('t')) {
 		/* threshold means percentages */
-		if (!is_set_option('p') && !is_set_option('P'))
-			fatal("option -t requires -p or -P");
+		if (!is_set_option('p'))
+		    fatal("option -t requires -p");
 	}
+	if (is_set_option('P')) {
+		if (!is_set_option('p'))
+		    fatal("option -P requires -p");
+	}
+	/* ZZ
+	if (is_set_option('u')) {
+		if (!is_set_option('p'))
+			fatal("option -u available with -p only");
+	}
+	*/
 
 	/* Treat the simple options */
 	if (is_set_option('v')) {
-		fprintf(stdout, "Version %s\n", VERSION);
+		fprintf(stdout, "%s\n", Version);
 		return 0;
 	}
 
-	if (is_set_option('P')) {
-		set_option('p');
-	}
 	if (is_set_option('p')) {
-		set_option('e');
 		set_option('s');
 	}
 
-	/* Treat the value options */
-	if (min_run_string) {
-		Min_Run_Size = atoi(min_run_string);
-		if (Min_Run_Size == 0)
-			fatal("bad or zero run size; form is: -r N");
-	}
-	if (page_width_string) {
-		Page_Width = atoi(page_width_string);
-		if (Page_Width <= 0)
-			fatal("bad or zero page width");
-	}
-	if (threshold_string) {
-		Threshold_Percentage = atoi(threshold_string);
+	/* Check the value options */
+	if (Min_Run_Size <= 0)
+		fatal("bad run size");
+	if (Page_Width <= 0)
+		fatal("bad page width");
+
+	if (is_set_option('p')) {
 		if ((Threshold_Percentage > 100) || (Threshold_Percentage <= 0))
 			fatal("threshold must be between 1 and 100");
 	}
+
 	if (output_name) {
 		Output_File = fopen(output_name, "w");
 		if (Output_File == 0) {
@@ -207,8 +213,12 @@ main(int argc, const char *argv[]) {
 	}
 	/* (argc, argv) now represents new_file* [ / old_file*] */
 
+	/* Optionally show command line options */
+	if (is_set_option('O')) {
+		print_options(progname, optlist);
+	}
+
 	/* Here the real work starts */
-	Init_Language();
 
 	if (is_set_option('-')) {
 		/* Just the lexical scan */
@@ -220,24 +230,23 @@ main(int argc, const char *argv[]) {
 			argv++;
 		}
 	}
-	else
-	if (is_set_option('p')) {
-		/* Show percentages */
-		read_and_compare_files(argc, argv, 1);
-		Show_Percentages();
-	} else {
-		/* Show runs */
-		read_and_compare_files(argc, argv, 1);
-		Retrieve_Runs();
-		Show_Runs();
+	else {	/* The works */
+		Read_Input_Files(argc, argv);
+		Make_Forward_References();
+		Compare_Files();
+		Free_Forward_References();
+		if (is_set_option('p')) {
+			Show_Percentages();
+		} else {
+			Retrieve_Runs();
+			Show_Runs();
+		}
 	}
 
+	Free_Text();
+	Free_Token_Array();
 	if (is_set_option('M')) {
-		/* It is not trivial to plug the leaks, because data structures
-		   point to each other, and have to be freed in the proper
-		   order. But it is not impossible either. To do, perhaps.
-		*/
-		ReportMemoryLeaks(stderr);
+		ReportMemoryStatus(stderr);
 	}
 
 	return 0;

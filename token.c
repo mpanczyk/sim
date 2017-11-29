@@ -1,6 +1,6 @@
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: token.c,v 2.12 2013-04-28 16:30:43 dick Exp $
+	$Id: token.c,v 2.13 2016-05-01 09:52:55 dick Exp $
 */
 
 /*
@@ -94,24 +94,6 @@ fprint_token(FILE *ofile, const Token tk) {
 	/* gap token! */
 	fprintf(ofile, "!0x%04x!", tki);
 }
-
-
-
-#ifdef	XXXX
-		int ch =   tki & 0177;
-		int meta = tki & 0200;
-
-		if (' ' <= ch && ch <= '~') {
-			fprintf(ofile, "%c%c", (meta ? '#' : ' '), ch);
-		}
-		else {
-			fprintf(ofile, "%c%c",
-				(meta ? '$' : '^'),
-				(ch == 0177 ? '?' : ch + '@')
-				);
-		}
-#endif
-
 
 int
 Token_EQ(const Token t1, const Token t2) {

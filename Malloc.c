@@ -1,6 +1,6 @@
-/*	This file is part of the memory management and leak detector MALLOC.
+/*	This file is part of the checked memory manager MALLOC.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: Malloc.c,v 1.15 2014-01-27 11:22:39 Gebruiker Exp $
+	$Id: Malloc.c,v 1.24 2017-01-24 19:46:57 Gebruiker Exp $
 */
 
 #include	<stdio.h>
@@ -10,6 +10,12 @@
 
 #include	"any_int.h"
 #include	"Malloc.h"
+/* make malloc.h available */
+#undef	malloc
+#undef	calloc
+#undef	realloc
+#undef	free
+
 
 /*Library module source prelude */
 #undef	_MALLOC_CODE_
@@ -34,33 +40,38 @@
 #undef	putchar
 #define	putchar	use_fprintf
 
-static void
-fprintloc(FILE *f, const char *fname, int l_nmb) {
-	fprintf(f, "\"%s\", line %d: ", fname, l_nmb);
-}
+static size_t restricted_balance = 0;	/* to simulate out-of-memory */
 
 static void
-out_of_memory(const char *fname, int l_nmb, size_t size) {
+fprintloc(FILE *out, const char *fname, int l_nmb) {
+	fprintf(out, "\"%s\", line %d: ", fname, l_nmb);
+}
+
+void
+_out_of_memory(const char *msg, const char *fname, int l_nmb, size_t size) {
 	fprintloc(stderr, fname, l_nmb);
-	fprintf(stderr, "Out of memory, requested size = %s bytes\n",
-		any_uint2string(size, 0));
+	fprintf(stderr, "OUT OF MEMORY");
+	if (msg) {
+		fprintf(stderr, ": %s", msg);
+	}
+	if (size != 0) {
+		fprintf(stderr, ", requested size = %s bytes",
+			any_uint2string(size, 0));
+	}
+	fprintf(stderr, "\n");
+	fflush(stderr);
+	ReportMemoryStatus(stderr);
 	exit(1);
 }
 
-#if	defined MEMLEAK || defined MEMCLOBBER
-/* Both need almost the same information: MEMLEAK obviously needs a list of
-   all blocks still allocated, but MEMCLOBBER needs the same list to find
-   the size of a block given to Free(), in order to clobber it.
-   MEMCLOBBER does not need total, balance and max, but finecombing them out
-   would be too much.
-*/
 
+							/* ADMINISTRATION */
 static vlong_uint total = 0;
 static vlong_uint balance = 0;
 static vlong_uint max = 0;
 
-struct record {
-	struct record *next;
+struct alloc {	/* corresponds to an allocated block */
+	struct alloc *next;
 	const char *addr;
 	size_t size;
 	const char *fname;
@@ -68,23 +79,24 @@ struct record {
 };
 
 #define	HASH_SIZE	16381		/* largest prime under 2^16 */
-static struct record *record_hash[HASH_SIZE];
-#define	chain_start(x)	record_hash[((unsigned int)(x)%HASH_SIZE)]
+static struct alloc *alloc_bucket[HASH_SIZE];
+#define	alloc_bucket_for(x)	alloc_bucket[((unsigned int)(x)%HASH_SIZE)]
 
 static void
-record_alloc(char *addr, size_t size, const char *fname, int l_nmb) {
-	struct record *new;
-	struct record **r_hook = &chain_start(addr);
+register_alloc(char *addr, size_t size, const char *fname, int l_nmb) {
+	/* registers the allocation of a block in the administration */
+	struct alloc *new;
+	struct alloc **al_hook = &alloc_bucket_for(addr);
 
 	if (addr == 0) return;
 
-	new = my_new(struct record);
+	new = my_new(struct alloc);
 	new->addr = addr;
 	new->size = size;
 	new->fname = fname;		/* no need to copy fname */
 	new->l_nmb = l_nmb;
-	new->next = *r_hook;
-	*r_hook = new;
+	new->next = *al_hook;
+	*al_hook = new;
 
 	total += size;
 	balance += size;
@@ -94,32 +106,33 @@ record_alloc(char *addr, size_t size, const char *fname, int l_nmb) {
 }
 
 
-static struct record **
-record_pointer_for_address(const char *addr) {
-	struct record **rp = &chain_start(addr);
+static struct alloc **
+pointer_to_alloc_for(const char *addr) {
+	struct alloc **al_hook = &alloc_bucket_for(addr);
 
-	while (*rp) {
-		if ((*rp)->addr == addr) break;
-		rp = &(*rp)->next;
+	while (*al_hook) {
+		if ((*al_hook)->addr == addr) break;
+		al_hook = &(*al_hook)->next;
 	}
 
-	return rp;
+	return al_hook;
 }
 
 static size_t
-record_free(char *addr) {
-	struct record **oldp = record_pointer_for_address(addr);
-	struct record *old = *oldp;
+register_free(char *addr) {
+	/* registers the freeing of a block */
+	struct alloc **old_p = pointer_to_alloc_for(addr);
+	struct alloc *old = *old_p;
 
 	if (old == 0) return (size_t) -1;
+	size_t old_size = old->size;
 
-	*oldp = old->next;/* this loses the struct record; is that a problem? */
-	balance -= old->size;
+	*old_p = old->next;
+	free((void *)old);
 
-	return old->size;
+	balance -= old_size;
+	return old_size;
 }
-
-#endif	/* defined MEMLEAK || defined MEMCLOBBER */
 
 void
 MemClobber(void *p, size_t size) {
@@ -131,10 +144,9 @@ MemClobber(void *p, size_t size) {
 	}
 }
 
-#ifdef	MEMLEAK
-
-struct entry {
-	struct entry *next;
+							/* MEMORY STATUS */
+struct call {	/* summarizes all the allocations at a call in the program */
+	struct call *next;
 	const char *fname;
 	int l_nmb;
 	unsigned int n_blocks;
@@ -142,173 +154,183 @@ struct entry {
 	size_t size;	/* !var_size: the one size; var_size: sum of sizes */
 };
 
-static struct entry *
-compacted_leaks(void) {
-	struct entry *res = 0;
+static struct call *
+compacted_calls(void) {
+	struct call *list_of_calls = 0;
 	int i;
 
 	for (i = 0; i < HASH_SIZE; i++) {
-		struct record *r = record_hash[i];
+		struct alloc *al = alloc_bucket[i];
 
-		while (r) {
-			struct entry *e = res;
+		while (al) {
+			struct call *cl = list_of_calls;
 
-			/* try to find an entry for this location */
-			while (e) {
-				if (	e->fname == r->fname
-				&&	e->l_nmb == r->l_nmb
+			/* try to find a call entry for this program location */
+			while (cl) {
+				if (	cl->fname == al->fname
+				&&	cl->l_nmb == al->l_nmb
 				)	break;
-				e = e->next;
+				cl = cl->next;
 			}
 
-			if (e) {	/* update the entry */
-				if (e->var_size) {
-					e->size += r->size;
+			if (cl) {
+				/* this is known call; update */
+				if (cl->var_size) {
+					cl->size += al->size;
 				}
-				else if (e->size != r->size) {
+				else if (cl->size != al->size) {
 					/* switch to var_size */
-					e->var_size = 1;
-					e->size =
-					    e->n_blocks*e->size + r->size;
+					cl->var_size = 1;
+					cl->size =
+					    cl->n_blocks*cl->size + al->size;
 				}
-				e->n_blocks++;
+				cl->n_blocks++;
 			}
-			else {		/* create a new entry */
-				e = my_new(struct entry);
-				e->fname = r->fname;
-				e->l_nmb = r->l_nmb;
-				e->n_blocks = 1;
-				e->var_size = 0;
-				e->size = r->size;
+			else {	/* this is a new call */
+				cl = my_new(struct call);
+				cl->fname = al->fname;
+				cl->l_nmb = al->l_nmb;
+				cl->n_blocks = 1;
+				cl->var_size = 0;
+				cl->size = al->size;
 
-				e->next = res;
-				res = e;
+				/* prepend to list_of_calls */
+				cl->next = list_of_calls;
+				list_of_calls = cl;
 			}
 
-			r = r->next;
+			al = al->next;
 		}
 	}
 
-	return res;
+	return list_of_calls;
 }
 
 static int
-number_of_leaks(const struct entry *e) {
+number_of_calls(const struct call *cl) {
 	int res = 0;
 
-	while (e != 0) {
+	while (cl != 0) {
 		res++;
-		e = e->next;
+		cl = cl->next;
 	}
 
 	return res;
 }
 
 static void
-report_actual_leaks(FILE *f) {
-	const struct entry *e = compacted_leaks();
-	int n_leaks = number_of_leaks(e);
+report_actual_call(FILE *out, const struct call *cl) {
+	fprintloc(out, cl->fname, cl->l_nmb);
+	fprintf(out, "still allocated: %d block%s of size ",
+		cl->n_blocks, (cl->n_blocks == 1 ? "" : "s")
+	);
+	if (cl->var_size) {
+		/* cl->size is the sum of the sizes */
+		size_t av = (cl->size+cl->n_blocks/2) / cl->n_blocks;
+		fprintf(out, "%s on average", any_uint2string(av, 0));
+		if (cl->n_blocks > 1) {
+			fprintf(out, " = %s", any_uint2string(cl->size, 0));
+		}
+	}
+	else {
+		/* cl->size is the single size */
+		fprintf(out, "%s", any_uint2string(cl->size, 0));
+		if (cl->n_blocks > 1) {
+			vlong_uint all = cl->size*cl->n_blocks;
+			fprintf(out, " = %s", any_uint2string(all, 0));
+		}
+	}
+	fprintf(out, "\n");
+}
 
-	if (n_leaks == 0) return;
+static void
+report_actual_calls(FILE *out) {
+	const struct call *cl = compacted_calls();	/* allocates cl */
+	int n_calls = number_of_calls(cl);
 
-	fprintf(f, "There %s %d case%s of unreclaimed memory:\n",
-		(n_leaks == 1 ? "was" : "were"),
-		n_leaks,
-		(n_leaks == 1 ? "" : "s")
+	if (n_calls == 0) return;
+
+	fprintf(out, "There %s %d call position%s with unreclaimed memory:\n",
+		(n_calls == 1 ? "is" : "are"),
+		n_calls,
+		(n_calls == 1 ? "" : "s")
 	);
 
-	while (e) {
-		fprintloc(f, e->fname, e->l_nmb);
-		fprintf(f, "left allocated: %d block%s of size ",
-			e->n_blocks, (e->n_blocks == 1 ? "" : "s")
-		);
-		if (e->var_size) {
-			/* e->size is the sum of the sizes */
-			fprintf(f, "%s on average",
-				any_uint2string(
-					(e->size+e->n_blocks/2) / e->n_blocks,
-					0
-				));
-			if (e->n_blocks > 1) {
-				fprintf(f, " = %s",
-					any_uint2string(e->size, 0));
-			}
-		}
-		else {
-			/* e->size is the single size */
-			fprintf(f, "%s", any_uint2string(e->size, 0));
-			if (e->n_blocks > 1) {
-				vlong_uint all = e->size*e->n_blocks;
-				fprintf(f, " = %s", any_uint2string(all, 0));
-			}
-		}
-		fprintf(f, "\n");
-
-		e = e->next;
+	while (cl) {
+		report_actual_call(out, cl);
+		struct call *next_cl = cl->next;
+		free((void *)cl);			/* frees cl */
+		cl = next_cl;
 	}
 }
 
 void
-ReportMemoryLeaks(FILE *f) {
-	if (f == 0) f = stderr;
-	report_actual_leaks(f);
+ReportMemoryStatus(FILE *out) {
+	if (out == 0) out = stderr;
+	report_actual_calls(out);
 
-	fprintf(f, "Total memory allocated = %s", any_uint2string(total, 0));
-	fprintf(f, ", maximum allocated = %s", any_uint2string(max, 0));
-	fprintf(f, ", garbage left = %s", any_uint2string(balance, 0));
-	fprintf(f, "\n");
+	fprintf(out, "Total memory allocated = %s", any_uint2string(total, 0));
+	fprintf(out, ", max. allocated = %s", any_uint2string(max, 0));
+	fprintf(out, ", still allocated = %s", any_uint2string(balance, 0));
+	fprintf(out, "\n");
+	fflush(out);
 }
 
-#else	/* no MEMLEAK */
-
-/*ARGSUSED*/
-void
-ReportMemoryLeaks(FILE *f) {
-}
-
-#endif	/* MEMLEAK */
-
+							/* MALLOC */
 void *
-_leak_malloc(int chk, size_t size, const char *fname, int l_nmb) {
-	void *res = malloc(size);
+_mreg_malloc(int chk, size_t size, const char *fname, int l_nmb) {
+	void *res;
 
-	if (chk && res == 0) {
-		out_of_memory(fname, l_nmb, size);
-		/*NOTREACHED*/
+	if (restricted_balance && balance + size > restricted_balance) {
+		res = 0;
+	} else {
+		res = malloc(size);
 	}
 
-#if	defined MEMLEAK || defined MEMCLOBBER
-	record_alloc(res, size, fname, l_nmb);
+	if (res == 0) {
+		if (chk) {
+			_out_of_memory(0, fname, l_nmb, size);
+			/*NOTREACHED*/
+		}
+		return res;
+	}
+
+	register_alloc(res, size, fname, l_nmb);
 
 #ifdef	MEMCLOBBER
 	MemClobber((char *)res, size);
 #endif	/* MEMCLOBBER */
-#endif	/* MEMLEAK || MEMCLOBBER */
 
 	return res;
 }
 
 void *
-_leak_calloc(int chk, size_t n, size_t size, const char *fname, int l_nmb) {
-	void *res = calloc(n, size);
+_mreg_calloc(int chk, size_t n, size_t size, const char *fname, int l_nmb) {
+	void *res;
 
-	if (chk && res == 0) {
-		out_of_memory(fname, l_nmb, n*size);
-		/*NOTREACHED*/
+	if (restricted_balance && balance + n*size > restricted_balance) {
+		res = 0;
+	} else {
+		res = calloc(n, size);
 	}
 
-#if	defined MEMLEAK || defined MEMCLOBBER
-	record_alloc(res, n*size, fname, l_nmb);
-#endif	/* MEMLEAK || MEMCLOBBER */
+	if (res == 0) {
+		if (chk) {
+			_out_of_memory(0, fname, l_nmb, n*size);
+			/*NOTREACHED*/
+		}
+		return res;
+	}
+
+	register_alloc(res, n*size, fname, l_nmb);
 
 	return res;
 }
 
 void *
-_leak_realloc(int chk, void *addr, size_t size, const char *fname, int l_nmb) {
+_mreg_realloc(int chk, void *addr, size_t size, const char *fname, int l_nmb) {
 	void *res;
-#if	defined MEMLEAK || defined MEMCLOBBER
-	size_t old_size = record_free(addr);
+	size_t old_size = register_free(addr);
 
 	/* we report first, because the realloc() below may cause a crash */
 	if (	/* we are not reallocating address 0, which is allowed */
@@ -318,18 +340,24 @@ _leak_realloc(int chk, void *addr, size_t size, const char *fname, int l_nmb) {
 	) {
 		fprintloc(stderr, fname, l_nmb);
 		fprintf(stderr, ">>>> unallocated block reallocated <<<<\n");
-	}
-#endif
-
-	res = realloc(addr, size);
-	if (chk && res == 0) {
-		out_of_memory(fname, l_nmb, size);
-		/*NOTREACHED*/
+		fflush(stderr);
 	}
 
-#if	defined MEMLEAK || defined MEMCLOBBER
-	record_alloc(res, size, fname, l_nmb);
-#endif	/* MEMLEAK || MEMCLOBBER */
+	if (restricted_balance && balance + size > restricted_balance) {
+		res = 0;
+	} else {
+		res = realloc(addr, size);
+	}
+
+	if (res == 0) {
+		if (chk) {
+			_out_of_memory(0, fname, l_nmb, size);
+			/*NOTREACHED*/
+		}
+		return res;
+	}
+
+	register_alloc(res, size, fname, l_nmb);
 
 #ifdef	MEMCLOBBER
 	if (old_size > 0 && size > old_size) {
@@ -342,28 +370,28 @@ _leak_realloc(int chk, void *addr, size_t size, const char *fname, int l_nmb) {
 
 /* ARGSUSED */
 void
-_leak_free(void *addr, const char *fname, int l_nmb) {
-#if	defined MEMLEAK || defined MEMCLOBBER
-	size_t old_size = record_free(addr);
+_mreg_free(void *addr, const char *fname, int l_nmb) {
+	size_t old_size = register_free(addr);
 
 	/* we report first, because the free() below may cause a crash */
 	if (old_size == (size_t) -1) {
 		fprintloc(stderr, fname, l_nmb);
 		fprintf(stderr, ">>>> unallocated block freed ");
 		fprintf(stderr, "or multiple free of allocated block <<<<\n");
+		fflush(stderr);
 	}
 	else {
 #ifdef	MEMCLOBBER
 	MemClobber((char *)addr, old_size);
 #endif	/* MEMCLOBBER */
 	}
-#endif	/* MEMLEAK || MEMCLOBBER */
 	free(addr);
 }
 
 char *
-_new_string(const char *s, const char *fname, int l_nmb) {
-	return strcpy((char *)(_leak_malloc(1, strlen(s)+1, fname, l_nmb)), s);
+_new_string(int chk, const char *s, const char *fname, int l_nmb) {
+	return strcpy((char *)(_mreg_malloc(chk, strlen(s)+1, fname, l_nmb)),
+		      s);
 }
 
 /* End library module source code */
@@ -374,15 +402,16 @@ static void
 satisfy_lint(void *x) {
 	void *v;
 
-	v = _leak_malloc(0, 0, 0, 0);
-	v = _leak_calloc(0, 0, 0, 0, 0);
-	v = _leak_realloc(0, 0, 0, 0, 0);
-	_leak_free(x, 0, 0);
+	v = _mreg_malloc(0, 0, 0, 0);
+	v = _mreg_calloc(0, 0, 0, 0, 0);
+	v = _mreg_realloc(0, 0, 0, 0, 0);
+	_mreg_free(x, 0, 0);
 
-	ReportMemoryLeaks(0);
+	OutOfMemoryExit(0);
+	ReportMemoryStatus(0);
 	MemClobber(v, 0);
 
-	v = _new_string(0, 0, 0);
+	v = _new_string(0, 0, 0, 0);
 	satisfy_lint(v);
 }
 #endif	/* lint */
