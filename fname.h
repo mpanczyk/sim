@@ -1,12 +1,16 @@
 /*	This file is part of the auxiliaries library.
 	Written by Dick Grune, dick@dickgrune.com
-	$Id: fname.h,v 1.13 2017-01-22 14:50:00 Gebruiker Exp $
+	$Id: fname.h,v 1.14 2017-12-13 17:41:34 Gebruiker Exp $
 */
 
-/*	Support for UNICODE file names */
+/*	Support for Unicode file names */
 
 /*
-   To accommodate UNICODE file names on various platforms, this file defines
+   Under Windows file names are internally kept in UTF-16 and if they contain
+   non-ASCII codes they have to be presented in UTF-16. Under *NIX systems
+   file names are in UTF-8, just as all other strings.
+
+   To accommodate non-ASCII file names on various platforms, this file defines
    the types
 
       Fchar             file name character
@@ -34,14 +38,13 @@
          The result of these two routines is transient: is is good only until
 	 the next call.
 
-   The only way to obtain a file name is through readdir; the command line
-   arguments are in ASCII. So a program can be adapted by replacing
+   The only way to obtain a UTF-16 file name is through readdir; the command
+   line arguments are in ASCII. So a program can be adapted by replacing
        DIR by Dir_t, and
        struct dirent by Dirent_t.
    Compiling and correcting using the above replacements until there are no
    more errors or warnings will then yield an UTF-16 compatible program, as
-   far as the input is concerned. Output is done in UTF-8; there seems to be
-   no way to do output in UFT-16.
+   far as the input file names concerned. Output is done in UTF-8.
 
    For details about UTF-16 see fname.c.
 */
@@ -50,7 +53,7 @@
 #define _FNAME_H_
 
 /* lint cannot handle the weird code Windows throws at it, so even under
-   Windows we claim to have UTF8
+   Windows we claim to have UTF-8
 */
 #ifdef	MSDOS
 #define	IS_UTF_16
@@ -119,4 +122,5 @@ typedef struct dirent Dirent_t;
 #define	Fclose		fclose
 
 #endif	/* MSDOS */
+
 #endif	/* _FNAME_H_ */

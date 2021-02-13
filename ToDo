@@ -1,7 +1,10 @@
+- check input for correct UTF-8, to prevent garbled display afterwards.
+  see EXP_UTF8 in pass3.c
+
 - tx_pos is a pig. struct texts are in principle immutable objects, except that
   lists of positions are attached to it. These lists (and that is the root of
-  the problem )are accessed from two points, one in pass2 to fill in NL
-  positions and in pass3 to report them. This makes it impossible to write
+  the problem )are accessed and modified from two points, one in pass2 to fill
+  in NL positions and in pass3 to report them. This makes it impossible to write
   const struct text in most places. Maybe there should be a superstruct
   struct super_text {
   	 const struct *st_text;
@@ -13,21 +16,17 @@
 
 - start,limit -> start,length
 
-- Bool.h
-
 - report runs as '... <matching text only> ...' (proper name for Retrieve_Runs())
 
 - unify idf2token() in *lang.l
 
 - get rid of static forward references to routines; occurrences:
       	     	    	    egr static *.c | grep "("
-      1 compare.c
-      7 hash.c
-      2 pass1.c
-      4 pass2.c
-     12 pass3.c
-      1 stream.c
-      3 text.c
+      3 compare.c
+      4 hash.c
+      3 options.c
+      4 percentages.c
+      3 runs.c
 
 - lex_nl_cnt counts from 1; this requires small, complicating adjustments
 

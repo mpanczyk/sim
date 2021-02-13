@@ -1,10 +1,14 @@
 .\"	This file is part of the software similarity tester SIM.
 .\"	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-.\"	$Id: sim.1,v 2.40 2017-03-19 09:30:38 dick Exp $
+.\"	$Id: sim.1,v 2.44 2017-12-13 20:20:47 dick Exp $
 .\"
-.TH SIM 1 2016/08/01
+.EQ
+delim $$
+.EN
+.TH SIM 1 2017/11/23
 .SH NAME
-sim \- find similarities in C, Java, Pascal, Modula-2, Lisp, Miranda, or text files
+sim \- find similarities in C, Java, Pascal, Modula-2, Lisp, Miranda, 8086
+assembler code or in text files
 .SH SYNOPSIS
 .B sim_c
 [
@@ -22,6 +26,9 @@ file ... [ [
 .B /
 .B |
 ] file ... ]
+.br
+.B sim_text
+\&...
 .br
 .B sim_c++
 \&...
@@ -41,7 +48,7 @@ file ... [ [
 .B sim_mira
 \&...
 .br
-.B sim_text
+.B sim_8086
 \&...
 .br
 .SH DESCRIPTION
@@ -65,9 +72,11 @@ for Pascal,
 for Modula-2,
 .I sim_mira
 for Miranda,
-and
 .I sim_lisp
-for Lisp.
+for Lisp,
+and
+.I sim_8086
+for 8086 assembler code.
 .I Sim_text
 works on arbitrary text and it is occasionally useful on shell scripts.
 .PP
@@ -118,10 +127,14 @@ Input in other formats, e.g.
 or
 .I .doc
 needs to be converted to ASCII or UTF-8 by preprocessing.
-Aggregated similarity results can be obtained by doing postprocessing on the
-output.
+Aggregated similarity results can be obtained by doing postprocessing on one
+of the forms of output.
 .PP
 There are the following options:
+.TP
+.B \-a
+All new files are compared to all files.
+See the section `Calculating Percentages' below.
 .TP
 .B \-d
 The output is in a diff(1)-like format instead of the default
@@ -254,13 +267,9 @@ inclusion, etc.) is ignored and all strings are considered equal.
 For
 .I sim_text
 a unit is a "word" which is defined as any sequence of one or more letters,
-digits, or characters over 127 (177 octal), to accommodate full UNICODE (UTF-8).
+digits, or characters over 127 (177 octal), to accommodate full Unicode (UTF-8).
 .PP
-The programs can handle UNICODE (UTF-16) file names under Windows.
-This is relevant only under the
-.B \-R
-option, since there is no way to supply UNICODE file names from the command
-line.
+The programs can handle Unicode (UTF-16) file names under Windows.
 .PP
 .I Sim_text
 accepts  s p a c e d   t e x t  as normal text.
@@ -270,50 +279,57 @@ Once
 has read, stored and preprocessed the input, it will no longer run out of
 memory.
 If memory is short it will change automatically to unbuffered, unsorted
-output (while isuuing a warning message).
-.SH WHAT IS COMPARED TO WHAT
+output (while issuing a warning message).
+.SH HOW SIMILARITY IS RECOGNIZED
+Since computers cannot test for similarity, only for equality, all units in
+the input files are replaced by 16-bit tokens, such that all units that are
+regarded as similar are reduced to the same token.
+For example in
+.I sim_c
+all identifiers are replaced by the token IDF and all strings are
+replaced by the token STR. The secret option
+.B "\-\-"
+can be used to see the resulting token sequence.
+.PP
+In
+.I sim_text
+each word is reduced to a 16-bit token using a hash function. There is a
+chance of 1 : 65536 that two different words get the same token value, but
+because recognized runs of tokens are usually several tokens long, the chances
+for accidental similarities are very low.
+.PP
+The sequence of tokens obtained this way is then processed as follows.
+.PP
 The default operation cycle of
 .I sim
-starts at the beginning of the first input file or at a point
-.I X
-in a file
-.I F
-among the new files, i.e. those before the new/old separator, if present.
+starts at the beginning of the token sequence of the first input file or at
+a position $X$ in file $F$ at which the previous cycle has left off.
 .I Sim
-then finds the longest segment
-.I S
-such that
-1)
-.I S
-is equal to the segment starting at
-.IR X ;
-2)
-.I S
-is situated somewhere between position
-.I X
-in
-.I F
-and the end of all files;
-3)
-.I S
-does not overlap with the segment starting at
-.IR X .
+then finds the longest segment $S$ such that
+1) $S$ is equal to the segment starting at $X$;
+2) $S$ is situated somewhere between position $X$ in $F$ and the end of all
+files;
+3) $S$ does not overlap with the segment starting at $X$.
 If the segment is at least of minimum run size, it is recorded, and the cycle
-starts again just after the segment at
-.IR X ;
-otherwise it starts again at
-.IR X+1 .
+starts again just after the segment at $X$;
+otherwise it starts again at $X+1$ .
 .PP
-So if the tokens at
-.I X
-read \fCabcabcadefabdabcz\fP, the cycle finds
-.I S
-to be the \fCabc\fP just before the end; \fCabda\fP at position 4 would be
-longer but overlaps.
-The cycle then starts at position 4, and will find another match with the
-\fCabc\fP near the end.
-Finally the third \fCab\fP be matched with the fourth \fCab\fP just before the
-\fCcz\fP.
+So if the token sequence at $X$ reads \fCabcabcadefabdabcz\fP, the cycle finds
+$S$ to be the \fCabc\fP just before the end; \fCabca\fP at $X+3$ would be
+longer but overlaps with the \fCabca\fP at $X+0$ .
+The cycle then starts at $X+3$, and will find another match with the \fCabc\fP
+near the end.
+Finally the \fCab\fP after the \fCf\fP will be matched with the \fCab\fP just
+before the \fCcz\fP.
+So the following matches are found:
+.ne 4
+.nf
+.sp
+$ X[0:2] = X[13:15] =$ \fCabc\fP
+$ X[3:5] = X[13:15] =$ \fCabc\fP
+$ X[9:10] = X[13:14] =$ \fCab\fP
+.sp
+.fi
 This way best matches for the text in a file are found in material
 to the right of it, until the end of all files.
 The results are asymmetric: given files
@@ -332,15 +348,16 @@ As explained below under "Limitations", this avoids duplicate reports of
 similarity and helps to keep
 .I sim
 fast.
-.PP
+.SH WHAT IS COMPARED TO WHAT
 The area that is searched by
 .I sim's
 cycle is called the
 .IR range .
-The default range (running from the file under observation to the end of all
-files) is excellent for finding similarities in program files,
-and, when doing percentages, for getting an impression of which files are
-related to which files, but sometimes more control is needed.
+The default range, which as we have seen above runs from the file under
+observation to the end of all files, is excellent for finding similarities in
+program files, and, when doing percentages, for getting an impression of which
+files are related to which files, but sometimes more control is needed.
+The following modifications to the range are available:
 .PP
 The
 .B \-a
@@ -545,7 +562,7 @@ roughly \fI2 log N\fP messages are given.
 .PP
 This also works out well when the four identical segments are in different
 files:
-,ne 4
+.ne 4
 .nf
 .ft C
     File1: A1

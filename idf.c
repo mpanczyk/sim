@@ -1,9 +1,10 @@
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: idf.c,v 2.19 2015-01-17 10:20:40 dick Exp $
+	$Id: idf.c,v 2.21 2017-12-11 14:12:34 dick Exp $
 */
 
 #include	<string.h>
+#include	<stdint.h>
 
 #include	"system.par"
 #include	"token.h"
@@ -13,11 +14,11 @@ Token
 idf_in_list(
 	const char *str,
 	const struct idf list[],
-	size_t listsize,
+	size_t list_size,
 	Token default_token
 ) {
 	int first = 0;
-	int last = (int) (listsize / sizeof (struct idf)) - 1;
+	int last = (int) (list_size / sizeof (struct idf)) - 1;
 
 	while (first < last) {
 		int middle = (first + last) / 2;
@@ -39,7 +40,7 @@ idf_in_list(
 
 Token
 idf_hashed(const char *str) {
-	int32 h = 0;
+	int32_t h = 0;
 
 	/* let's be careful about ranges; if done wrong it's hard to debug */
 	while (*str) {

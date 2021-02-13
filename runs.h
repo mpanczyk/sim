@@ -1,6 +1,6 @@
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: runs.h,v 1.13 2016-07-31 18:55:44 dick Exp $
+	$Id: runs.h,v 1.14 2017-11-27 20:15:54 dick Exp $
 */
 
 /*	Although all other segments of data in this program are described by
@@ -32,7 +32,3 @@ extern void add_to_runs(
 extern struct run *sorted_runs(void);
 extern struct run *unsorted_runs(void);
 extern void discard_runs(void);
-
-#ifdef	DB_RUN
-extern void db_run_info(const char *msg, const struct run *run, int lines_too);
-#endif	/* DB_RUN */

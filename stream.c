@@ -1,6 +1,6 @@
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: stream.c,v 2.14 2016-05-13 19:00:54 dick Exp $
+	$Id: stream.c,v 2.20 2017-12-13 13:37:23 dick Exp $
 */
 
 #include	<stdio.h>
@@ -9,39 +9,38 @@
 
 #include	"system.par"
 #include	"sim.h"
-#include	"options.h"
 #include	"token.h"
 #include	"lang.h"
+#include	"fname.h"
 #include	"stream.h"
 
-static FILE *fopen_regular_file(const char *fname);
+static FILE *
+fopen_regular_file(const char *fname) {
+	struct stat buf;
+
+	if (Stat(str2Fname(fname), &buf) != 0) return 0;
+	if ((buf.st_mode & S_IFMT) != S_IFREG) return 0;
+	return Fopen(str2Fname(fname), "r");
+}
 
 int
 Open_Stream(const char *fname) {
-	int ok;
-
 	lex_nl_cnt = 1;
-	lex_tk_cnt = 0;
-	lex_non_ascii_cnt = 0;
+	lex_tk_cnt = 0;		/* but is raised before the token is delivered,
+				   so effectively *_tk_cnt starts at 1:
+				   TK_CNT_HORROR
+				*/
+	lex_non_ASCII_cnt = 0;
 
 	/* start the lex machine */
 	yyin = fopen_regular_file(fname);
-	ok = (yyin != 0);
+	int ok = (yyin != 0);
 	if (!ok) {
 		/* fake a stream, to simplify the rest of the program */
 		yyin = fopen(NULLFILE, "r");
 	}
 	yystart();
 	return ok;
-}
-
-static FILE *
-fopen_regular_file(const char *fname) {
-	struct stat buf;
-
-	if (stat(fname, &buf) != 0) return 0;
-	if ((buf.st_mode & S_IFMT) != S_IFREG) return 0;
-	return fopen(fname, "r");
 }
 
 int

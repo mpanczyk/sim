@@ -1,6 +1,6 @@
 /*	This file is part of the checked memory manager MALLOC.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: Malloc.h,v 1.14 2017-01-23 13:30:23 Gebruiker Exp $
+	$Id: Malloc.h,v 1.16 2017-12-13 17:41:34 Gebruiker Exp $
 */
 
 #ifndef	_MALLOC_H_
@@ -80,6 +80,9 @@ Notes:
 *    The system consumes hardly any time and is fast enough to be kept active
      at all times.
 *****/
+
+#include	<stdio.h>		/* for FILE */
+#include	<stdlib.h>		/* for size_t */
 
 /* Blocking malloc.h */
 #define	malloc(s)	you_are_using_the_Malloc_package_so_use_Malloc

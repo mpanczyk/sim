@@ -1,6 +1,6 @@
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: compare.c,v 2.38 2016-08-07 15:24:17 dick Exp $
+	$Id: compare.c,v 2.44 2017-12-11 14:12:33 dick Exp $
 */
 
 #include	"sim.h"
@@ -8,21 +8,11 @@
 #include	"token.h"
 #include	"tokenarray.h"
 #include	"hash.h"
-#include	"language.h"
+#include	"properties.h"
 #include	"options.h"
 #include	"add_run.h"
 #include	"compare.h"
 #include	"debug.par"
-
-/*	The overall structure of the routine Compare_Files() is:
-
-	for all new files
-		for all texts it must be compared to
-			for all positions in the new file
-				for all positions in the text
-					for ever increasing sizes
-						try to match and keep the best
-*/
 
 							/* LOCAL VARIABLES */
 static size_t beginning_of_text;
@@ -61,8 +51,18 @@ static size_t lcs(
 	struct text **tx_bp, size_t *i_bp
 );
 
-void
-Compare_Files(void) {
+/*	The overall structure of the routine compare_texts() is:
+
+	for all new files
+		for all texts it must be compared to
+			for all positions in the new file
+				for all positions in the text
+					for ever increasing sizes
+						try to match and keep the best
+*/
+
+static void
+compare_texts(void) {
 	int n;
 
 	for (	/* all new texts */
@@ -252,6 +252,7 @@ lcs(	struct text *txt0,		/* text to be compared */
 
 		/* Find the text txt1 into which i1 points. */
 #if	0
+		/* by sequential search */
 		struct text *txt1 = txt0;
 		while (i1 < txt1->tx_start) {
 			txt1--;
@@ -260,6 +261,7 @@ lcs(	struct text *txt0,		/* text to be compared */
 			txt1++;
 		}
 #else
+		/* by binary search */
 		struct text *txt1;
 		{	struct text *txt_b = &Text[0];
 			struct text *txt_e = &Text[Number_of_Texts-1];
@@ -276,9 +278,6 @@ lcs(	struct text *txt0,		/* text to be compared */
 #endif
 		if (!(txt1->tx_start <= i1 && i1 < txt1->tx_limit))
 			fatal("i1 not inside txt1");
-
-
-
 
 #ifdef	DB_COMP
 		fprintf(Debug_File, "for i1: %s, i0=%d,%s, i1=%d\n",
@@ -310,7 +309,7 @@ lcs(	struct text *txt0,		/* text to be compared */
 				   better_size tokens
 				*/
 				/* since we have perfect forward references and
-				   chack backwards, we do not have to check the
+				   check backwards, we do not have to check the
 				   last Min_Run_Size tokens:
 				*/
 				size_t cnt = better_size - Min_Run_Size;
@@ -320,7 +319,7 @@ lcs(	struct text *txt0,		/* text to be compared */
 					"init verification: cnt = %d", cnt);
 #ifdef	DB_COMP_2
 				/* we don't want this all the time under
-				   DB_COMP, but we want it linted
+				   DB_COMP, but we want it checked by lint
 				*/
 				fprint_tokens(Debug_File, i0, i0+better_size);
 				fprint_tokens(Debug_File, i1, i1+better_size);
@@ -374,7 +373,7 @@ lcs(	struct text *txt0,		/* text to be compared */
 			"end forward extension: new_size = %d\n", new_size);
 #endif
 
-		/* Offer the run to the Language Department which may
+		/* Offer the run to the Language module which may
 		   reject it or may cut its tail.
 		*/
 		new_size = Best_Run_Size(&Token_Array[i0], new_size);
@@ -403,4 +402,11 @@ lcs(	struct text *txt0,		/* text to be compared */
 #endif
 
 	return size_best;
+}
+
+void
+Compare_Files(void) {
+	Make_Forward_References();
+	compare_texts();
+	Free_Forward_References();
 }

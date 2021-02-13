@@ -1,6 +1,6 @@
 /*	This file is part of the debugging module DEBUG.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: debug.c,v 1.7 2014-09-25 06:58:25 Gebruiker Exp $
+	$Id: debug.c,v 1.8 2017-12-08 18:07:16 Gebruiker Exp $
 */
 
 #include	<stdlib.h>
@@ -30,18 +30,18 @@ wr_char(char ch) {
 }
 
 static void
+wr_str(const char *s) {
+	while (*s) {
+		wr_char(*s++);
+	}
+}
+
+static void
 wr_num(int b,int v) {
 	if (v >= b) {
 		wr_num(b, v/b);
 	}
 	wr_char("0123456789ABCDEF"[v%b]);
-}
-
-static void
-wr_str(const char *s) {
-	while (*s) {
-		wr_char(*s++);
-	}
 }
 
 void

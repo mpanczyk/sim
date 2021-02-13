@@ -1,13 +1,13 @@
 %{
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: clang.l,v 2.28 2017-12-11 14:12:33 dick Exp $
+	$Id: pasclang.l,v 2.2 2017-12-11 14:12:36 dick Exp $
 */
 
 /*
-	C language front end for the similarity tester.
-	Author:	Dick Grune <dick@cs.vu.nl>
-	Date:	1986-05-18
+	PASCAL language front end for the similarity tester.
+	Author:	Maarten van der Meulen <maarten@cs.vu.nl>
+	Date: May 1986
 */
 
 #include	"options.h"
@@ -40,35 +40,42 @@ static const struct idf ppcmd[] = {
 };
 
 static const struct idf reserved[] = {
-	{"auto",	NORM('a')},
-	{"break",	NORM('b')},
+	{"and",		NORM('&')},
+	{"array",	NORM('A')},
+	{"begin",	NORM('{')},
 	{"case",	NORM('c')},
-	{"char",	NORM('C')},
-	{"continue",	CTRL('C')},
-	{"default",	NORM('d')},
+	{"const",	NORM('C')},
+	{"div",		NORM('/')},
 	{"do",		NORM('D')},
-	{"double",	CTRL('D')},
+	{"downto",	NORM('d')},
 	{"else",	NORM('e')},
-	{"enum",	NORM('E')},
+	{"end",		NORM('}')},
 	{"extern",	CTRL('E')},
-	{"float",	NORM('f')},
-	{"for",		NORM('F')},
+	{"file",	NORM('F')},
+	{"for",		NORM('f')},
+	{"function",	NORM('p')},	/* Equal to procedure */
 	{"goto",	NORM('g')},
 	{"if",		NORM('i')},
-	{"int",		NORM('I')},
-	{"long",	NORM('l')},
-	{"register",	No_Token},
-	{"return",	NORM('r')},
-	{"short",	NORM('s')},
-	{"sizeof",	NORM('S')},
-	{"static",	CTRL('S')},
-	{"struct",	META('s')},
-	{"switch",	META('S')},
-	{"typedef",	NORM('t')},
-	{"union",	NORM('u')},
-	{"unsigned",	NORM('U')},
-	{"void",	No_Token},
-	{"while",	NORM('w')}
+	{"in",		NORM('I')},
+	{"label",	NORM('l')},
+	{"mod",		NORM('%')},
+	{"nil",		NORM('n')},
+	{"not",		NORM('!')},
+	{"of",		No_Token},
+	{"or",		NORM('|')},
+	{"packed",	NORM('P')},
+	{"procedure",	NORM('p')},
+	{"program",	No_Token},
+	{"record",	NORM('r')},
+	{"repeat",	NORM('R')},
+	{"set",		NORM('s')},
+	{"then",	No_Token},
+	{"to",		NORM('t')},
+	{"type",	NORM('T')},
+	{"until",	NORM('u')},
+	{"var",		NORM('v')},
+	{"while",	NORM('w')},
+	{"with",	NORM('W')}
 };
 
 /* Special treatment of identifiers */
@@ -77,6 +84,7 @@ static Token
 idf2token(int hashing) {
 	Token tk;
 
+	lower_case(yytext);		/* Pascal is case-insensitive */
 	tk = idf_in_list(yytext, reserved, sizeof reserved, IDF);
 	if (Token_EQ(tk, IDF) && hashing) {
 		/* return a one-Token hash code */
@@ -86,53 +94,45 @@ idf2token(int hashing) {
 }
 
 /* Token sets for properties module */
-static const Token Non_Finals[] = {
+const Token Non_Finals[] = {
 	IDF,		/* identifier */
-	NORM('{'),
+	NORM('{'),	/* also begin */
 	NORM('('),
-	NORM('a'),	/* auto */
-	NORM('b'),	/* break */
+	NORM('['),
+	NORM('A'),	/* array */
 	NORM('c'),	/* case */
-	NORM('C'),	/* char */
-	CTRL('C'),	/* continue */
-	NORM('d'),	/* default */
-	NORM('D'),	/* do */
-	CTRL('D'),	/* double */
-	NORM('E'),	/* enum */
+	NORM('C'),	/* const */
+	NORM('/'),	/* div */
 	CTRL('E'),	/* extern */
-	NORM('f'),	/* float */
-	NORM('F'),	/* for */
+	NORM('F'),	/* file */
+	NORM('f'),	/* for */
 	NORM('g'),	/* goto */
 	NORM('i'),	/* if */
-	NORM('I'),	/* int */
-	NORM('l'),	/* long */
-	NORM('r'),	/* return */
-	NORM('s'),	/* short */
-	CTRL('S'),	/* static */
-	META('s'),	/* struct */
-	META('S'),	/* switch */
-	NORM('t'),	/* typedef */
-	NORM('u'),	/* union */
-	NORM('U'),	/* unsigned */
+	NORM('l'),	/* label */
+	NORM('P'),	/* packed */
+	NORM('p'),	/* procedure/function */
+	NORM('r'),	/* record */
+	NORM('R'),	/* repeat */
+	NORM('s'),	/* set */
+	NORM('T'),	/* type */
+	NORM('v'),	/* var */
 	NORM('w'),	/* while */
+	NORM('W'),	/* with */
 	No_Token
 };
-
-static const Token Non_Initials[] = {
+const Token Non_Initials[] = {
 	NORM(')'),
 	NORM('}'),
 	NORM(';'),
 	No_Token
 };
-
-static const Token Openers[] = {
+const Token Openers[] = {
 	NORM('{'),
 	NORM('('),
 	NORM('['),
 	No_Token
 };
-
-static const Token Closers[] = {
+const Token Closers[] = {
 	NORM('}'),
 	NORM(')'),
 	NORM(']'),
@@ -141,17 +141,12 @@ static const Token Closers[] = {
 
 /* Language-dependent code */
 
-const char *Subject = "C programs";
+const char *Subject = "Pascal programs";
 
 void
 Init_Language(void) {
 	Init_Language_Properties(Non_Finals, Non_Initials, Openers, Closers);
 }
-
-/* UTF-8 bytes in strings and comment are absorbed in patterns starting
-   with [^...]. Non-ASCII chars outside strings or comments are counted in
-   lex_non_ASCII_cnt.
-*/
 
 %}
 
@@ -163,31 +158,19 @@ Layout		([ \t\r\f])
 ASCII95		([\040-\176])
 
 AnyQuoted	(\\.)
-StrChar		([^\"\n\\]|{AnyQuoted})
-ChrChar		([^\'\n\\]|{AnyQuoted})
+StrChar		([^\'\n\\]|{AnyQuoted})
 
-StartComment	("/*")
-EndComment	("*/")
-SafeComChar	([^*\n])
+StartComment	("{"|"(*")
+EndComment	("}"|"*)")
+SafeComChar	([^*}\n])
 UnsafeComChar	("*")
 
-MSComment	("//"{MSCommentChar}*)
-MSCommentChar	([^\n])
-
-HexDigit	([0-9a-fA-F])
-Idf		([A-Za-z_][A-Za-z0-9_]*)
+Digit		([0-9])
+Idf		([A-Za-z][A-Za-z0-9_]*)
 
 %%
 
-{StartComment}	{
-		/*	We do not have one single pattern to match a comment
-			(although one can be written), for two reasons.
-			The matched string might overflow lex-internal buffers
-			like yysbuf and yytext; and the pattern would be very
-			complicated and impair maintainability.
-			So we break up the string into safe chunks and keep
-			track of where we are in a start condition <Comment>.
-		*/
+{StartComment}	{			/* See clang.l */
 		BEGIN Comment;
 	}
 
@@ -205,15 +188,8 @@ Idf		([A-Za-z_][A-Za-z0-9_]*)
 		BEGIN INITIAL;
 	}
 
-{MSComment}	{			/* ignore */
-	}
-
-\"{StrChar}*\"	{			/* strings */
+\'{StrChar}*\'	{			/* character strings */
 		return_ch(STR);
-	}
-
-\'{ChrChar}+\'	{			/* characters */
-		return_ch('\'');
 	}
 
 ^#{Layout}*include.*	{		/* ignore #include lines */
@@ -229,7 +205,7 @@ Idf		([A-Za-z_][A-Za-z0-9_]*)
 		return_tk(idf_in_list(idf, ppcmd, sizeof ppcmd, NORM('#')));
 	}
 
-(0x)?{HexDigit}+("l"|"L")?	{	/* numeral, passed as an identifier */
+{Digit}+	{			/* numeral, passed as an identifier */
 		return_tk(IDF);
 	}
 

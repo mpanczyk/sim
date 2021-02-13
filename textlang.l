@@ -1,11 +1,13 @@
 %{
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: textlang.l,v 1.21 2016-05-13 19:00:55 dick Exp $
+	$Id: textlang.l,v 1.25 2017-12-11 14:12:37 dick Exp $
 */
 
 /*
 	Text front end for the similarity tester.
+	Author:	Dick Grune <dick@cs.vu.nl>
+	Date:	1986-06-02
 */
 
 #include	"sim.h"
@@ -14,13 +16,12 @@
 
 #include	"lex.h"
 #include	"lang.h"
-#include	"language.h"
 
 /* General language front end data */
 Token lex_token;
 size_t lex_nl_cnt;
 size_t lex_tk_cnt;
-size_t lex_non_ascii_cnt;
+size_t lex_non_ASCII_cnt;		/* not applicable in text files */
 
 /* Language-dependent code */
 
@@ -34,20 +35,6 @@ Init_Language(void) {
 	Threshold_Percentage = 20;
 }
 
-/*ARGSUSED*/
-int
-May_Be_Start_Of_Run(Token tk) {
-	/* any token is acceptable */
-	return 1;
-}
-
-/*ARGSUSED*/
-size_t
-Best_Run_Size(const Token *str, size_t size) {
-	/* any run size is acceptable */
-	return size;
-}
-
 static Token
 word2token(char *word) {
 	/* ignore case */
@@ -58,6 +45,7 @@ word2token(char *word) {
 %}
 
 %option	noyywrap
+
 
 WordElem	([a-zA-Z0-9\200-\377])
 TightWord	({WordElem}+)
@@ -82,7 +70,8 @@ SpacedWord	({LooseElem}+{WordElem})
 		return_eol();
 	}
 
-.	{			/* ignore the rest */
+.	{				/* ignore the rest */
+		/* UTF-8 bytes are included in WordElem */
 	}
 
 %%

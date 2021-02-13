@@ -1,18 +1,18 @@
 %{
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: m2lang.l,v 2.21 2017-03-19 09:23:19 dick Exp $
+	$Id: m2lang.l,v 2.26 2017-12-11 14:12:35 dick Exp $
 */
 
 /*
 	Modula-2 language front end for the similarity tester.
 	Author:	Dick Grune <dick@cs.vu.nl>
+	Date:	1986-12-02
 */
 
 #include	"options.h"
 #include	"token.h"
-#include	"language.h"
-#include	"algollike.h"
+#include	"properties.h"
 #include	"idf.h"
 #include	"lex.h"
 #include	"lang.h"
@@ -21,7 +21,7 @@
 Token lex_token;
 size_t lex_nl_cnt;
 size_t lex_tk_cnt;
-size_t lex_non_ascii_cnt;
+size_t lex_non_ASCII_cnt;
 
 /* Language-dependent data */
 
@@ -160,7 +160,7 @@ idf2token(int hashing) {
 	return tk;
 }
 
-/* Token sets for module algollike */
+/* Token sets for properties module */
 const Token Non_Finals[] = {
 	IDF,		/* identifier */
 	NORM('{'),	/* also BEGIN */
@@ -211,18 +211,7 @@ const char *Subject = "Modula-2 programs";
 
 void
 Init_Language(void) {
-	Init_Algol_Language(Non_Finals, Non_Initials, Openers, Closers);
-}
-
-
-int
-May_Be_Start_Of_Run(Token ch) {
-	return May_Be_Start_Of_Algol_Run(ch);
-}
-
-size_t
-Best_Run_Size(const Token *str, size_t size) {
-	return Best_Algol_Run_Size(str, size);
+	Init_Language_Properties(Non_Finals, Non_Initials, Openers, Closers);
 }
 
 %}
@@ -243,7 +232,7 @@ EndComment	("*)")
 SafeComChar	([^*\n])
 UnsafeComChar	("*")
 
-Digit		([0-9a-fA-F])
+HexDigit	([0-9a-fA-F])
 Idf		([A-Za-z][A-Za-z0-9_]*)
 
 %%
@@ -276,14 +265,14 @@ Idf		([A-Za-z][A-Za-z0-9_]*)
 	}
 
 \"{QuStrChar}*\"	{		/* quoted strings */
-		return_ch('"');
+		return_ch(STR);
 	}
 
 \'{ApoStrChar}*\'	{		/* apostrophed strings */
-		return_ch('"');
+		return_ch(STR);
 	}
 
-{Digit}+("B"|"C"|"H")?	{		/* numeral, passed as an identifier */
+{HexDigit}+("B"|"C"|"H")?	{	/* numeral, passed as an identifier */
 		return_tk(IDF);
 	}
 
@@ -323,7 +312,7 @@ Idf		([A-Za-z][A-Za-z0-9_]*)
 	}
 
 .	{				/* count non-ASCII chars */
-		lex_non_ascii_cnt++;
+		lex_non_ASCII_cnt++;
 	}
 
 %%

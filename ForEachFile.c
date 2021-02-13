@@ -1,6 +1,6 @@
 /*	This file is part of the auxiliaries library.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: ForEachFile.c,v 1.23 2016-02-22 08:20:42 Gebruiker Exp $
+	$Id: ForEachFile.c,v 1.25 2017-12-13 17:41:34 Gebruiker Exp $
 */
 
 #include	<string.h>
@@ -52,7 +52,7 @@ is_Admin_Dirname(const Fchar *Fn) {
 	||	Fnamecmp(Fn, str2Fname("..")) == 0;
 }
 
-static void do_dir(
+static void do_dir(	/* mutually recursive with do_name() */
 	Fchar *Fn,
 	int (*proc)(const Fchar *, const char *, const struct stat *)
 );

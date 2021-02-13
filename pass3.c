@@ -1,248 +1,104 @@
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: pass3.c,v 2.31 2016-07-31 18:55:44 dick Exp $
+	$Id: pass3.c,v 2.43 2017-12-15 17:15:21 dick Exp $
 */
 
 #include	<stdio.h>
 #include	<string.h>
 
 #include	"system.par"
-#include	"settings.par"
 #include	"debug.par"
 #include	"sim.h"
+#include	"options.h"
+#include	"fname.h"
+#include	"utf8.h"
 #include	"text.h"
 #include	"token.h"
 #include	"runs.h"
-#include	"options.h"
-#include	"pass3.h"
 #include	"percentages.h"
+#include	"pass3.h"
 
 #ifdef	DB_RUN
 #include	"tokenarray.h"
-static void db_run(const struct run *);
+#include	"pass3_db.i"
 #endif
 
-/* Positioning of UTF-8 characters must be done with a finer grain than just
-   10 Courier characters to the inch. On the other hand we do not know the
-   exact width of each UNICODE character, so whatever we do is an approximation.
-   We use a granularity of 1 pt and a font size of 10 pts.
-
-   Since C does not have type-checked integer subtypes, we put the the fact
-   that they handle UTF-8 chars in the variable and routine names to avoid
-   errors.
+/* Positioning UTF-8 non-ASCII characters is a problem. Even if we use
+   a much finer grain than just 10 Courier characters to the inch, which is
+   easy to do, and even if we accessed UTF-8 character width tables, which are
+   not readily available, the problem still cannot be solved because we have
+   no way to position the middle bar over non-integer character widths.
+   Users can avoid the problem by using the -d option, so we just do
+   reasonable best effort, based on a granularity of 1 pt and a
+   font size of 10 pts.
 */
+
 typedef int pts;
-#define	FONT_SIZE	(10)
+#define	ASCII_WIDTH	(10)
+/* It turns out that fairly precisely
+      9 Courier chars = 5 Hangul chars == 15 UTF-8 bytes
+   in length. Since 9 Courier chars occupy 90 pts, this makes 1 UTF-8 byte
+   equal to 6 pts. This is a heuristic, for want of something better.
+*/
+#define	UTF8_WIDTH	(6)
 
-static FILE *open_chunk(const struct chunk *);
-static void print_char(char);
-static void print_spaces(int);
-static pts print_UTF8_line(FILE *);
-static pts print_UTF8_char(int ch, FILE *);
-static void print_UTF8_spaces(pts);
-static void show_run(const struct run *);
-static void show_1C_line(FILE *, const char *);
-static int print_header(const struct chunk *);
-static int print_string(const char *);
-static int print_size_t(size_t);
-static int length_size_t(size_t);
+#define	is_ascii_byte(bt)		((bt&0200) == 0000)
+#define	is_leading_utf8_byte(bt)	((bt&0300) == 0300)
+#define	is_continuation_utf8_byte(bt)	((bt&0300) == 0200)
 
-static int max_line_length;		/* Actual maximum line length */
-static pts max_line_length_UTF8;
+							/* AUXILIARIES */
 
-void
-Show_Runs(void) {
-#ifdef	DB_RUN
-	fprintf(Debug_File, "Starting Show_Runs()\n");
-#endif	/* DB_RUN */
-	const struct run *run = /*ZZ*/
-		(is_set_option('u') ? unsorted_runs() : sorted_runs());
-
-	while (run) {
-#ifdef	DB_RUN
-		db_run(run);
-#endif	/* DB_RUN */
-		show_run(run);
-		print_char('\n');
-		fflush(Output_File);
-		run = run->rn_next;
-	}
-
-	discard_runs();
-}
-
-static void
-show_run(const struct run *run) {
-	max_line_length = Page_Width / 2 - 1;
-	max_line_length_UTF8 = max_line_length * FONT_SIZE;
-
-	/* The animals came in two by two ... */
-	const struct chunk *cnk0 = &run->rn_chunk0;
-	const struct chunk *cnk1 = &run->rn_chunk1;
-	size_t nl_cnt0 = cnk0->ch_last.ps_nl_cnt - cnk0->ch_first.ps_nl_cnt;
-	size_t nl_cnt1 = cnk1->ch_last.ps_nl_cnt - cnk1->ch_first.ps_nl_cnt;
-	FILE *f0;
-	FILE *f1;
-
-	/* display heading of chunk */
-	if (!is_set_option('d')) {
-		/* no assumptions about the lengths of the file names! */
-		size_t size = run->rn_size;
-		int pos = print_header(cnk0);
-		print_spaces(max_line_length - pos);
-		print_char('|');
-		pos = print_header(cnk1);
-		print_spaces(max_line_length - pos - length_size_t(size) - 2);
-		fprintf(Output_File, "[%s]\n", size_t2string(size));
-	}
-	else {
-		/* diff-like format */
-		(void)print_header(cnk0);
-		print_char('\n');
-		(void)print_header(cnk1);
-		print_char('\n');
-	}
-
-	/* stop if that suffices */
-	if (is_set_option('n'))
-		return;			/* ... had enough so soon ... */
-
-	/* open the files that hold the chunks */
-	f0 = open_chunk(cnk0);
-	f1 = open_chunk(cnk1);
-
-	/* display the chunks in the required format */
-	if (!is_set_option('d')) {
-		/* print 2-column format */
-		while (nl_cnt0 != 0 || nl_cnt1 != 0) {
-			int pos_UTF8 = 0;
-			if (nl_cnt0) {
-				pos_UTF8 = print_UTF8_line(f0);
-				nl_cnt0--;
-			}
-			print_UTF8_spaces(max_line_length_UTF8 - pos_UTF8);
-			print_char('|');
-			if (nl_cnt1) {
-				(void)print_UTF8_line(f1);
-				nl_cnt1--;
-			}
-			print_char('\n');
-		}
-	}
-	else {
-		/* display the chunks in a diff(1)-like format */
-		while (nl_cnt0--) {
-			show_1C_line(f0, "<");
-		}
-		(void)print_string("---\n");
-		while (nl_cnt1--) {
-			show_1C_line(f1, ">");
-		}
-	}
-
-	/* close the pertinent files */
-	fclose(f0);
-	fclose(f1);
-}
-
-static int
-print_header(const struct chunk *cnk) {
-	int pos = 0;
-
-	pos += print_string(cnk->ch_text->tx_fname);
-	pos += print_string(": line ");
-	pos += print_size_t(cnk->ch_first.ps_nl_cnt);
-	pos += print_string("-");
-	pos += print_size_t(cnk->ch_last.ps_nl_cnt - 1);
-	return pos;
-}
-
-static int
+static pts
 print_string(const char *str) {
+	/* assumes str to be UTF-8-correct */
+	const char *s = str;
+
 	fprintf(Output_File, "%s", str);
-	return (int) strlen(str);
+
+	/* compute the printed length */
+	pts len = 0;
+	while (*s) {
+		len += (is_ascii_byte(*s) ? ASCII_WIDTH : UTF8_WIDTH);
+		s++;
+	}
+	return len;
 }
 
-static int
-print_size_t(size_t u) {
-	fprintf(Output_File, "%s", size_t2string(u));
-	return length_size_t(u);
-}
-
-static int
-length_size_t(size_t u) {
-	int res = 1;
+static pts
+width_of_size_t(size_t u) {
+	pts res = ASCII_WIDTH;
 
 	while (u > 9) {
-		u /= 10, res++;
+		u /= 10, res += ASCII_WIDTH;
 	}
 	return res;
 }
 
-static FILE *
-open_chunk(const struct chunk *cnk) {
-	/*	Opens the file in which the chunk resides, positions the
-		file at the beginning of the chunk and returns the file pointer.
-		Note that we use fopen() here, which opens a character stream,
-		rather than Open_Text(), which opens a token stream.
-	*/
-	const char *fname = cnk->ch_text->tx_fname;
-	FILE *f = fopen(fname, "r");
-	size_t nl_cnt;
-
-	if (!f) {
-		fprintf(stderr, ">>>> File %s disappeared <<<<\n", fname);
-		f = fopen(NULLFILE, "r");
-	}
-
-	nl_cnt = cnk->ch_first.ps_nl_cnt;
-	while (nl_cnt > 1) {
-		int ch = getc(f);
-
-		if (ch < 0) break;
-		if (ch == '\n') {
-			nl_cnt--;
-		}
-	}
-
-	return f;
+static pts
+print_size_t(size_t u) {
+	fprintf(Output_File, "%s", size_t2string(u));
+	return width_of_size_t(u);
 }
 
+							/* CHUNK PRINTING */
+
 static pts
-print_UTF8_line(FILE *f) {
-	/* Reads one line from f and prints it in condensed form. */
-	int indent = 0, pos_UTF8 = 0;
-	int ch;
+print_header(const struct chunk *cnk) {
+	pts width = 0;
 
-	/* condense initial blanks */
-	while ((ch = getc(f)), ch == ' ' || ch == '\t') {
-		if (ch == '\t') {
-			indent = 8;
-		}
-		else {
-			indent++;
-		}
-		if (indent == 8) {
-			/* every eight blanks give one blank */
-			if (pos_UTF8 < max_line_length_UTF8) {
-				pos_UTF8 += print_UTF8_char(' ', 0);
-			}
-			indent = 0;
-		}
-	}
+	width += print_string(cnk->ch_text->tx_fname);
+	width += print_string(": line ");
+	width += print_size_t(cnk->ch_first.ps_nl_cnt);
+	width += print_string("-");
+	width += print_size_t(cnk->ch_last.ps_nl_cnt);
+	return width;
+}
 
-	/* print the rest */
-	while (ch >= 0 && ch != '\n') {
-		if (ch == '\t') {
-			/* replace tabs by blanks */
-			ch = ' ';
-		}
-		if (pos_UTF8 < max_line_length_UTF8) {
-			pos_UTF8 += print_UTF8_char(ch, f);
-		}
-		ch = getc(f);
+static void
+print_spaces(pts n) {
+	while (n > 0) {
+		n -= print_string(" ");
 	}
-	return pos_UTF8;
 }
 
 static void
@@ -251,101 +107,204 @@ print_char(char ch) {
 }
 
 static void
-print_spaces(int n) {
-	while (n > 0) {
-		print_char(' '), --n;
+print_2_headers(
+    const struct chunk *cnk0, const struct chunk *cnk1,
+    pts max_line_length, size_t size
+) {
+	if (!is_set_option('d')) {
+		/* no assumptions about the lengths of the file names! */
+		pts width = print_header(cnk0);
+		print_spaces(max_line_length - width);
+		print_char('|');
+		width = print_header(cnk1);
+		/* add width of the print to come */
+		width += ASCII_WIDTH + width_of_size_t(size) + ASCII_WIDTH;
+		print_spaces(max_line_length - width);
+		fprintf(Output_File, "[%s]\n", size_t2string(size));
 	}
+	else {
+		/* diff-like format */
+		(void)print_header(cnk0);
+		fprintf(Output_File, " [%s]\n", size_t2string(size));
+		(void)print_header(cnk1);
+		print_char('\n');
+	}
+}
+
+static FILE *
+open_chunk(const struct chunk *cnk) {
+	/* Opens the file in which the chunk resides, positions the file
+	   at the beginning of the chunk and returns the file pointer.
+	*/
+
+	const char *fname = cnk->ch_text->tx_fname;
+	FILE *f = Fopen(str2Fname(fname), "r");
+	/* ^ Note that we use [Ff]open() here, which opens a character stream,
+	   rather than Open_Text(), which opens a token stream.
+	*/
+
+	if (!f) {
+		fprintf(stderr, ">>>> File %s disappeared <<<<\n", fname);
+		f = fopen(NULLFILE, "r");
+	}
+
+	/* skip ch_first.ps_nl_cnt newlines */
+	size_t nl_cnt = cnk->ch_first.ps_nl_cnt;
+	while (nl_cnt > 1) {
+		int ch = getc(f);
+		if (ch < 0) break;
+
+		if (ch == '\n') {
+			nl_cnt--;
+		}
+	}
+
+	return f;
+}
+
+static int
+fill_ubox(FILE *f, utf8_box *u) {
+	int len = 0;
+	while (len == 0) {
+		do {	int byte = getc(f);
+			if (byte < 0) return 0;
+			len = box_utf8(byte, u);
+		} while (len <= 0);		/* reject bad UTF-8 */
+		if (!is_valid_utf8(u)) len = 0;	/* reject non-Unicode */
+	}
+	return len;
 }
 
 static pts
-print_UTF8_char(int ch, FILE *f) {
-	int pos_UTF8 = FONT_SIZE;
-	fprintf(Output_File, "%c", ch);
-	if (ch < 192) return pos_UTF8;
-
-	while (ch & 0x40) {
-		int ch1 = getc(f);
-		fprintf(Output_File, "%c", ch1);
-		if ((ch1 & 0xC0) != 0x80) {
-			/* bad UTF-8 */
-			return pos_UTF8;	/* no recovery */
-		}
-		pos_UTF8 += 4;
-		/* ^ Stupid heuristic: the longer the UTF sequence, the bigger
-		   the character. Rough, but the best we can reasonably do.
-		*/
-		ch <<= 1;
-	}
-	return pos_UTF8;
-}
-
-static void
-print_UTF8_spaces(pts n) {
-	while (n > 0) {
-		print_char(' '), n -= FONT_SIZE;
-	}
-}
-
-static void
-show_1C_line(FILE *f, const char *marker) {
-	/*	displays one line from f, preceded by the marker
+print_line(FILE *f, pts max_line_length) {
+	/* Reads one line from f and prints it in condensed form, up to a
+	   maximum length of max_line_length.
 	*/
-	int ch;
+	pts width = 0;
+	int at_beginning_of_line = 1, last_was_space = 0;
+	utf8_box u; clear_utf8_box(&u);
+
+	int len;
+	while (len = fill_ubox(f, &u)) {
+		/* take a critical look at what we've got */
+		char u0 = u.text[0];
+		if (u0 == '\n') break;			/* stop on end of line*/
+		if (u0 == '\t') u0 = u.text[0] = ' ';	/* reduce tab to space*/
+		if ('\0' <= u0 && u0 < ' ') continue;	/* skip non-printables*/
+
+		/* condense spaces where appropriate */
+		if (!at_beginning_of_line && u0 == ' ') {
+			if (last_was_space) continue;
+			last_was_space = 1;
+		} else {
+			at_beginning_of_line = 0;
+			last_was_space = 0;
+		}
+
+		/* UTF8 char ok, print it? */
+		pts ch_width = (len == 1 ? ASCII_WIDTH : len * UTF8_WIDTH);
+		if (width + ch_width <= max_line_length) {
+			fprintf(Output_File, "%s", u.text);
+			width += ch_width;
+		}
+	}
+	return width;
+}
+
+static void
+print_1_line(FILE *f, const char *marker) {
+	/* displays one line from f, preceded by the marker */
+	/* there is no length limitation, so we do not bother with UTF-8 */
 
 	fprintf(Output_File, "%s ", marker);
+
+	int ch;
 	while ((ch = getc(f)), ch > 0 && ch != '\n') {
 		print_char(ch);
 	}
 	print_char('\n');
 }
 
-#ifdef	DB_RUN
+static void
+print_2_chunks(
+    const struct chunk *cnk0, const struct chunk *cnk1,
+    pts max_line_length
+) {
+	/* open the files holding the chunks at the positions of those chunks */
+	FILE *f0 = open_chunk(cnk0);
+	FILE *f1 = open_chunk(cnk1);
 
-static void db_chunk(const struct chunk *);
+	/* display the chunks in the required format */
+	size_t nl_cnt0 = cnk0->ch_last.ps_nl_cnt - cnk0->ch_first.ps_nl_cnt + 1;
+	size_t nl_cnt1 = cnk1->ch_last.ps_nl_cnt - cnk1->ch_first.ps_nl_cnt + 1;
+
+	if (!is_set_option('d')) {
+		/* print 2-column format */
+		while (nl_cnt0 != 0 || nl_cnt1 != 0) {
+			pts width = 0;
+			if (nl_cnt0) {
+				width = print_line(f0, max_line_length);
+				nl_cnt0--;
+			}
+			print_spaces(max_line_length - width);
+			print_char('|');
+			if (nl_cnt1) {
+				(void)print_line(f1, max_line_length);
+				nl_cnt1--;
+			}
+			print_char('\n');
+		}
+	}
+	else {
+		/* display the chunks in a diff(1)-like format */
+		while (nl_cnt0--) {
+			print_1_line(f0, "<");
+		}
+		(void)print_string("---\n");
+		while (nl_cnt1--) {
+			print_1_line(f1, ">");
+		}
+	}
+
+	/* close the pertinent files */
+	fclose(f0);
+	fclose(f1);
+}
 
 static void
-db_run(const struct run *run) {
-	/* prints detailed data about a run */
+print_run(const struct run *run) {
+	pts max_line_length = (Page_Width / 2 - 1) * ASCII_WIDTH;
+
 	const struct chunk *cnk0 = &run->rn_chunk0;
 	const struct chunk *cnk1 = &run->rn_chunk1;
 
-	db_run_info(0, run, 1);
-	db_chunk(cnk0);
-	db_chunk(cnk1);
+	print_2_headers(cnk0, cnk1, max_line_length, run->rn_size);
+
+	/* stop if that suffices */
+	if (is_set_option('n'))	return;
+
+	print_2_chunks(cnk0, cnk1, max_line_length);
 }
 
-static void
-db_chunk(const struct chunk *cnk) {
-	/*	print the tokens in the chunk, with a one-char margin
-	*/
-	size_t i;
-	const struct position *first = &cnk->ch_first;
-	const struct position *last = &cnk->ch_last;
-	size_t start = cnk->ch_text->tx_start;
+							/* PRINT RUNS */
 
-	if (first->ps_tk_cnt > 0) {
-		fprintf(Debug_File, "...");
-		fprint_token(Debug_File,
-			Token_Array[start + first->ps_tk_cnt - 1]);
-		fprintf(Debug_File, "  ");
-	}
-	else {	/* create same offset as above */
-		fprintf(Debug_File, "       ");
-	}
-
-	for (i = first->ps_tk_cnt; i <= last->ps_tk_cnt; i++) {
-		fprintf(Debug_File, " ");
-		fprint_token(Debug_File, Token_Array[start + i]);
-	}
-
-	if (start + last->ps_tk_cnt + 1 < cnk->ch_text->tx_limit) {
-		fprintf(Debug_File, "  ");
-		fprint_token(Debug_File,
-			Token_Array[start + last->ps_tk_cnt + 1]);
-		fprintf(Debug_File, "...");
-	}
-
-	fprintf(Debug_File, "\n");
-}
-
+void
+Print_Runs(void) {
+#ifdef	DB_RUN
+	fprintf(Debug_File, "Starting Print_Runs()\n");
 #endif	/* DB_RUN */
+	const struct run *run =
+		(is_set_option('u') ? unsorted_runs() : sorted_runs());
+
+	while (run) {
+#ifdef	DB_RUN
+		db_run(run);
+#endif	/* DB_RUN */
+		print_run(run);
+		print_char('\n');
+		fflush(Output_File);
+		run = run->rn_next;
+	}
+
+	discard_runs();
+}

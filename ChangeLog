@@ -1,8 +1,122 @@
-2017-03-19  Dick Grune  <Gebruiker@GEBRUIKER-PC>
+2017-12-10  Dick Grune  <Gebruiker@GEBRUIKER-PC>
+
+	* 8086lang.l: 8086 assembler front end added, courtesy of Yaoyao Lei
+	(雷瑶瑶 <lyyfight122@gmail.com>) of the Beijing University Of Posts
+	and Telecommunications.
+
+	* Makefile (Generic Language module): the languages module specs for
+	the by now 8 languages are tedious and repetitious. Replaced by a
+	generic module and a recursive call of 'make'.
+
+2017-12-06  Dick Grune  <dick@dickgrune.com>
+
+	* text.c (init_nl_buff): Removal of nl_buff or pass 2 - Considerations
+	For finding similarities we need the input files in token form; for
+	displaying similarities we need them in character form. Ideally we
+	would like to have both in memory so files need to be read once, but
+	for mass comparisons that is infeasible. Also, runs may start in the
+	middle of an line, and we want to display whole lines, so to display a
+	line we often need characters from before the first token of a run.
+
+	History.
+	The original 1986 design condenses the input into a token array (pass
+	1), using calls of yylex(). At the same time pass 1 fills an array
+	'nl_buff' with the required start-of-line info, if available memory
+	permits (this is 1986).
+	This costs 1 reading of each file using yylex().
+
+	Compare creates a list of 'runs' from the token array. A run
+	identifies identical sequences of tokens by two 'chunks'. Each chunk
+	identifies the sequence by a file name and two 'positions' in that
+	file; the positions are counted in tokens. The two sequences
+	identified by the two chunks are equal when viewed as tokens, but they
+	can of course differ widely as characters. 'Compare' also connects all
+	chunks referring to the same file in a linked list.
+
+	Pass 2 finds the correct line numbers that go with the token positions
+	in the chunks, as follows. For each file F it takes the list L that
+	connects the chunks for F, sorts them, and fills in the line numbers
+	by following L in parallel with either nl_buff or, if that does not
+	exist, F itself.
+	This costs 0 (if nl_buff exists) or 1 (if not) reading of each file
+	using yylex(). 'nl_buff' is an optimization to prevent another read
+	operation using yylex().
+
+	Pass 3 now has the begin and end points of text sequences in terms of
+	character positions in the files, and can easily print the similar
+	portions of these files.
+	This costs N reading of each file using getc(), where N is the number
+	of chunks in which the file occurs.
+
+	The present situation.
+	In mass comparisons there is no room for nl_buff, but mass comparisons
+	usually want percentages rather than the text segments themselves, so
+	for percentage measurements the nl_buff mechanism gets turned off.
+	This leaves us with the 'normal' users, who supply a few hundred files
+	and get a few dozen runs. For these users it does not matter what we
+	do on present computers: there is memory and reading speed enough.
+	So nobody cares for nl_buff any more: it is dead wood. Question is, do
+	we remove it? (Doing so is simple enough).
+
+	But we can go further and remove pass 2 at all: pass 3 could for each
+	chunk in file F first obtain start-of-line info by reading F with
+	yylex(), and then use this info to position and read F using
+	This would cost N reads with yylex() and N reads with getc(); it
+	also would require new code in pass 3.
+
+	In summary, removing nl_buff would cost little effort and make sim 1
+	yylex() read slower for each file occurring in a run; and removing
+	pass 2 would require code substantial effort and slow down sim by N-1
+	yylex() reads.
+
+2017-12-05  Dick Grune  <dick@dickgrune.com>
+
+	* stream.c (Open_Stream):  lex_tk_cnt is initially set to 0 but is
+	raised before the token is delivered, so effectively lex_tk_cnt starts
+	at 1. Also the first token is stored in	Token_Array[0].
+	Now, in set_pos() in runs.c ps_tk_cnt is set from the parameter
+	'start', which via set_chunk is set to 'i0 - txt0->tx_start'. This
+	computes the start of the chunk as the distance of its first token to
+	the start of the text segment, so for the first token this distance
+	is 0. As a result ps_tk_cnt is 1 behind lex_tk_cnt. This requires
+	funny code, for example in match_pos_list_of() in pass2.c where the
+	code requires >= where > is obviously correct.
+	This is harder to correct than the nl problem below, and such places
+	in the code are marked with TK_CNT_HORROR.
+
+2017-12-03  Dick Grune  <dick@dickgrune.com>
+
+	* pass2.c (match_pos_list_of): ch_last.ps_nl_cnt was consistently 1 too
+	high. This was caused by match_pos_list_of() taking the value of
+	lex_nl_cnt only *after* the next EOL had been seen. This was corrected
+	inside match_pos_list_of() for ch_last.ps_nl_cnt but not for
+	ch_first.ps_nl_cnt. Corrected by tweaks in pass2.c and pass3.c .
+
+2017-11-27  Dick Grune  <dick@dickgrune.com>
+
+	* Since the amount of debugging code in some files made it difficult
+	to get a good view of the algorithms, the debugging code was moved
+	into *_db.i files, to be included with a simple #include.
+
+	This did not work for db_print_nl_buff(), which is used in pass2.c but
+	uses nl_buff, which is local to text.c. To be solved, or the problem
+	might go away if and when the nl_buff system is removed.
+
+2017-11-26  Dick Grune  <dick@dickgrune.com>
+
+	* Makefile (ABS_CFS): cleaning up the interface between the *lang.l
+	files and the rest of the program resulted in the removal of the
+	language.[ch] module, leaving lang.[ch] as the only abstract
+	module. See lang.h .
+
+	(PROP_CFS): With these changes all traces of specifiec Algol
+	properties have gone and "algollike.?" has been renamed "properties.?".
+
+2017-03-19  Dick Grune  <dick@dickgrune.com>
 
 	*  c++lang.l contributed by Evin Murphy (evin.murphy@ucdconnect.ie).
 
-2016-08-07  Dick Grune  <Gebruiker@GEBRUIKER-PC>
+2016-08-07  Dick Grune  <dick@dickgrune.com>
 
 	* compare.c (lcs): Finding the text into which i1 points was done by
 	linear search. Replaced by binary search. This resulted in no direct
@@ -31,7 +145,7 @@
 
 2016-05-29  Dick Grune
 
-	* pass3.c: Surprisingly, very large runs of the program can get out of
+	* pass3.c: Surprisingly, very large runs of the program can run out of
 	memory far into the computation, in spite of the fact that sim
 	allocates almost all its memory while reading the input. However, the
 	found runs of text are collected using Mallocked memory, for producing
@@ -752,5 +866,5 @@
 
 #	This file is part of the software similarity tester SIM.
 #	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-#	$Id: ChangeLog,v 2.33 2017-03-19 09:30:37 dick Exp $
+#	$Id: ChangeLog,v 2.41 2017-12-10 16:39:57 dick Exp $
 #

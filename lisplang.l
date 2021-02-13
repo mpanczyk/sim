@@ -1,7 +1,7 @@
 %{
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: lisplang.l,v 2.19 2017-03-19 09:23:19 dick Exp $
+	$Id: lisplang.l,v 2.23 2017-12-11 14:12:35 dick Exp $
 */
 
 /*
@@ -11,8 +11,7 @@
 */
 
 #include	"token.h"
-#include	"language.h"
-#include	"algollike.h"
+#include	"properties.h"
 #include	"lex.h"
 #include	"lang.h"
 
@@ -20,7 +19,7 @@
 Token lex_token;
 size_t lex_nl_cnt;
 size_t lex_tk_cnt;
-size_t lex_non_ascii_cnt;
+size_t lex_non_ASCII_cnt;
 
 /* Language-dependent data */
 #include	"idf.h"
@@ -45,7 +44,7 @@ static const struct idf reserved[] = {
 	{"rplacd",	NORM('D')}
 };
 
-/* Token sets for module algollike */
+/* Token sets for properties module */
 const Token Non_Finals[] = {
 	NORM('('),
 	NORM('['),
@@ -73,18 +72,7 @@ const char *Subject = "Lisp programs";
 
 void
 Init_Language(void) {
-	Init_Algol_Language(Non_Finals, Non_Initials, Openers, Closers);
-}
-
-
-int
-May_Be_Start_Of_Run(Token ch) {
-	return May_Be_Start_Of_Algol_Run(ch);
-}
-
-size_t
-Best_Run_Size(const Token *str, size_t size) {
-	return Best_Algol_Run_Size(str, size);
+	Init_Language_Properties(Non_Finals, Non_Initials, Openers, Closers);
 }
 
 %}
@@ -112,7 +100,7 @@ Idf		({EscIdf}|{QuotIdf})
 	}
 
 \"{StrChar}*\"	{			/* strings */
-		return_ch('"');
+		return_ch(STR);
 	}
 
 {Idf}	{				/* identifier */
@@ -131,7 +119,7 @@ Idf		({EscIdf}|{QuotIdf})
 	}
 
 .	{				/* count non-ASCII chars */
-		lex_non_ascii_cnt++;
+		lex_non_ASCII_cnt++;
 	}
 
 %%

@@ -1,11 +1,11 @@
 /*	This file is part of the auxiliaries library.
 	Written by Dick Grune, dick@dickgrune.com
-	$Id: fname.c,v 1.8 2017-01-22 14:50:00 Gebruiker Exp $
+	$Id: fname.c,v 1.10 2017-12-13 17:41:34 Gebruiker Exp $
 */
 
-/*	Support for UNICODE file names in Windows */
+/*	Support for Unicode file names in Windows */
 
-/*	Two data types are involved in UNICODE file names in Windows:
+/*	Two data types are involved in Unicode file names in Windows:
 
 		UTF16 strings, the file names as stored by Windows, and
 		UTF8 strings, the names as they are displayed and stored.
@@ -235,7 +235,9 @@ CodePoint_to_UTF16_sequence(UTF32 cp) {
 
 		return res;
 	}
-	else return NULL;
+
+	/* the CodePoint does not correspond to a UTF16 sequence */
+	return NULL;
 }
 
 const char *	/* transient */

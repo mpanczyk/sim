@@ -1,6 +1,6 @@
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: token.c,v 2.13 2016-05-01 09:52:55 dick Exp $
+	$Id: token.c,v 2.14 2017-11-23 15:46:40 dick Exp $
 */
 
 /*
@@ -53,6 +53,7 @@ fprint_token(FILE *ofile, const Token tk) {
 
 	if (Token_EQ(tk, No_Token))	{fprintf(ofile, "--"); return;}
 	if (Token_EQ(tk, IDF))		{fprintf(ofile, "IDF"); return;}
+	if (Token_EQ(tk, STR))		{fprintf(ofile, "STR"); return;}
 	if (Token_EQ(tk, End_Of_Line))	{fprintf(ofile, "EOL"); return;}
 
 	if (is_simple_token(tk)) {
@@ -95,8 +96,10 @@ fprint_token(FILE *ofile, const Token tk) {
 	fprintf(ofile, "!0x%04x!", tki);
 }
 
+#ifdef	lint_test
 int
 Token_EQ(const Token t1, const Token t2) {
 	/* to make sure Token_EQ is indeed called with two Token parameters */
 	return Token2int(t1) == Token2int(t2);
 }
+#endif	/* lint_test */

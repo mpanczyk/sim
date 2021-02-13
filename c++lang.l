@@ -1,7 +1,7 @@
 %{
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: c++lang.l,v 2.2 2017-03-19 09:23:19 dick Exp $
+	$Id: c++lang.l,v 2.8 2017-12-11 14:12:33 dick Exp $
 */
 
 /*
@@ -9,12 +9,12 @@
 	Based on C language front end written by Dick Grune <dick@cs.vu.nl>
 	Author:	Dick Grune <dick@cs.vu.nl>
 	Modified by: Evin Murphy, UCD Dublin, Ireland
+	Date:	2017-03-15
 */
 
 #include	"options.h"
 #include	"token.h"
-#include	"language.h"
-#include	"algollike.h"
+#include	"properties.h"
 #include	"idf.h"
 #include	"lex.h"
 #include	"lang.h"
@@ -23,7 +23,7 @@
 Token lex_token;
 size_t lex_nl_cnt;
 size_t lex_tk_cnt;
-size_t lex_non_ascii_cnt;
+size_t lex_non_ASCII_cnt;
 
 /* Language-dependent data */
 
@@ -130,7 +130,7 @@ idf2token(int hashing) {
 	return tk;
 }
 
-/* Token sets for module algollike */
+/* Token sets for properties module */
 static const Token Non_Finals[] = {
 	IDF,			/* identifier */
 	NORM('{'),
@@ -231,18 +231,7 @@ const char *Subject = "C++ programs";
 
 void
 Init_Language(void) {
-	Init_Algol_Language(Non_Finals, Non_Initials, Openers, Closers);
-}
-
-
-int
-May_Be_Start_Of_Run(Token ch) {
-	return May_Be_Start_Of_Algol_Run(ch);
-}
-
-size_t
-Best_Run_Size(const Token *str, size_t size) {
-	return Best_Algol_Run_Size(str, size);
+	Init_Language_Properties(Non_Finals, Non_Initials, Openers, Closers);
 }
 
 %}
@@ -254,10 +243,7 @@ Best_Run_Size(const Token *str, size_t size) {
 Layout		([ \t\r\f])
 ASCII95		([\040-\176])
 
-Digit		([0-9a-fA-F])
-
-UniCode		(\\u{Digit}{Digit}{Digit}{Digit})
-AnyQuoted	((\\.)|{UniCode})
+AnyQuoted	(\\.)
 StrChar		([^\"\n\\]|{AnyQuoted})
 ChrChar		([^\'\n\\]|{AnyQuoted})
 
@@ -268,7 +254,8 @@ UnsafeComChar	("*")
 
 SingleLineCom	("//".*)
 
-Idf		([A-Za-z][A-Za-z0-9_]*)
+HexDigit	([0-9a-fA-F])
+Idf		([A-Za-z_][A-Za-z0-9_]*)
 
 %%
 
@@ -303,7 +290,7 @@ Idf		([A-Za-z][A-Za-z0-9_]*)
 	}
 
 \"{StrChar}*\"	{			/* strings */
-		return_ch('"');
+		return_ch(STR);
 	}
 
 \'{ChrChar}+\'	{			/* characters */
@@ -323,7 +310,7 @@ Idf		([A-Za-z][A-Za-z0-9_]*)
 		return_tk(idf_in_list(idf, ppcmd, sizeof ppcmd, NORM('#')));
 	}
 
-(0x)?{Digit}+("l"|"L")?	{		/* numeral, passed as an identifier */
+(0x)?{HexDigit}+("l"|"L")?	{      	/* numeral, passed as an identifier */
 		return_tk(IDF);
 	}
 
@@ -357,7 +344,7 @@ Idf		([A-Za-z][A-Za-z0-9_]*)
 	}
 
 .	{				/* count non-ASCII chars */
-		lex_non_ascii_cnt++;
+		lex_non_ASCII_cnt++;
 	}
 
 %%

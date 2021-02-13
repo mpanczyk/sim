@@ -1,6 +1,6 @@
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: newargs.c,v 2.11 2016-05-13 19:00:52 dick Exp $
+	$Id: newargs.c,v 2.12 2017-12-13 20:20:47 dick Exp $
 */
 
 #include	<stdio.h>
@@ -38,7 +38,7 @@ add_char_to_args(char ch) {
 }
 
 static void
-add_string_to_args(const Fchar *fn) {
+add_string_to_args(const char *fn) {
 	while (*fn) {
 		add_char_to_args(*fn++);
 	}
@@ -127,7 +127,7 @@ register_file(const Fchar *fn, const char *msg, const struct stat *fs) {
 	if (	/* it is a non-empty regular file */
 		S_ISREG(fs->st_mode) && fs->st_size > 0
 	) {
-		add_string_to_args(fn);
+		add_string_to_args(Fname2str(fn));
 	}
 	return 1;
 }
@@ -142,11 +142,10 @@ recursive_args(int argc, const char *argv[]) {
 
 		for (i = 0; i < argc; i++) {
 			const char *arg = argv[i];
-			const Fchar *Farg = str2Fname(arg);
 			if (is_new_old_separator(arg)) {
-				add_string_to_args(Farg);
+				add_string_to_args(arg);
 			} else {
-				ForEachFile(Farg, register_file);
+				ForEachFile(str2Fname(arg), register_file);
 			}
 		}
 	}

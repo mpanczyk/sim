@@ -1,12 +1,12 @@
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: token.h,v 2.13 2017-02-04 16:58:54 dick Exp $
+	$Id: token.h,v 2.16 2017-12-11 14:12:38 dick Exp $
 */
 
 /*
 	Token interface.
 	Since the definition of a token has been a continual source of
-	problems, it is now defined as an ADT 'Token'.
+	problems, it is now defined as an abstract data type 'Token'.
 
 	There are four classes of tokens:
 	1. simple tokens; they derive directly from input characters;
@@ -34,18 +34,21 @@
 */
 
 #include	<stdio.h>
+#include	<stdint.h>
 
 #ifndef	_TOKEN_H
 #define	_TOKEN_H
 
 #ifdef	lint_test
 /* For security we want to distinguish tokens from integers. Lint is not
-   good at this, so for checking we use a pointer to a weird data type
+   good at this, so for checking we use a pointer to a weird data type.
 */
 struct for_lint_only {int i;};
 typedef struct for_lint_only *Token;
+extern int Token_EQ(const Token t1, const Token t2);
 #else	/* if normal */
-typedef unsigned short Token;
+typedef uint16_t Token;
+#define	Token_EQ(t1,t2)	(Token2int(t1) == Token2int(t2))
 #endif	/* lint_test/normal */
 
 #define	N_TOKENS		(1<<16)
@@ -53,10 +56,11 @@ typedef unsigned short Token;
 
 /* Macros for the composition of tokens */		/* range (gaps unused)*/
 #define	No_Token	int2Token(0)			/* 0x0000 */
-/* UTF-8 characters */					/* 0x0001-0x00FF */
+/* 8-bit bytes */					/* 0x0001-0x00FF */
 #define	CTRL(ch)	int2Token(0x100|((ch)&0x01F))	/* 0x0101-0x011E */
 #define	NORM(ch)	int2Token(0x100|((ch)&0x07F))	/* 0x0121-0x017E */
-#define	IDF		int2Token(0x180)		/* 0x0180 */
+#define	IDF		int2Token(0x17F)		/* 0x017F */
+#define	STR		int2Token(0x180)		/* 0x0180 */
 #define	MTCT(ch)	int2Token(0x180|((ch)&0x01F))	/* 0x0181-0x019E */
 #define	META(ch)	int2Token(0x180|((ch)&0x07F))	/* 0x01A1-0x01FE */
 /* tokens from idf_hashed() */				/* 0x0200-0xFFFE */
@@ -68,7 +72,6 @@ typedef unsigned short Token;
 
 /* Auxiliaries */
 #define	is_regular_token(tk)	(Token2int(tk) < N_REGULAR_TOKENS)
-extern int Token_EQ(const Token t1, const Token t2);
 extern void fprint_token(FILE *ofile, const Token tk);
 
 #endif	/* _TOKEN_H */

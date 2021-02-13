@@ -1,6 +1,6 @@
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: options.c,v 1.20 2017-03-19 09:30:37 dick Exp $
+	$Id: options.c,v 1.22 2017-11-26 18:10:15 dick Exp $
 */
 
 #include	<stdio.h>
@@ -8,7 +8,7 @@
 
 #include	"sim.h"
 #include	"token.h"
-#include	"language.h"
+#include	"lang.h"
 #include	"options.h"
 
 static char options[128];

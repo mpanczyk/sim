@@ -1,6 +1,6 @@
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: runs.c,v 1.17 2016-07-31 18:55:44 dick Exp $
+	$Id: runs.c,v 1.19 2017-11-27 20:15:54 dick Exp $
 */
 
 #include	"sim.h"
@@ -65,12 +65,14 @@ set_pos(struct position *pos, int type, struct text *txt, size_t start) {
 	pos->ps_nl_cnt = (size_t) -1;		/* uninitialized */
 }
 
-/* instantiate sort_run_list(struct run **listhook) */
+/* begin instantiate */
+static void sort_run_list(struct run **listhook);
 #define	SORT_STRUCT		run
 #define	SORT_NAME		sort_run_list
 #define	SORT_BEFORE(r0,r1)	((r0)->rn_size > (r1)->rn_size)
 #define	SORT_NEXT		rn_next
 #include	"sortlist.bdy"
+/* end instantiate */
 
 static void
 reverse_runs(struct run **r_p) {
@@ -107,38 +109,3 @@ discard_runs(void) {
 		Free(r);
 	}
 }
-
-#ifdef	DB_RUN
-
-void
-db_run_info(const char *msg, const struct run *run, int lines_too) {
-	const struct chunk *cnk0 = &run->rn_chunk0;
-	const struct chunk *cnk1 = &run->rn_chunk1;
-
-	if (msg) {
-		fprintf(Debug_File, "%s: ", msg);
-	}
-	fprintf(Debug_File, "\"%s\" / \"%s\":\n",
-		cnk0->ch_text->tx_fname, cnk1->ch_text->tx_fname
-	);
-	fprintf(Debug_File, "from %s %s/%s to %s/%s:", Token_Name,
-		size_t2string(cnk0->ch_first.ps_tk_cnt),
-		size_t2string(cnk1->ch_first.ps_tk_cnt),
-		size_t2string(cnk0->ch_last.ps_tk_cnt),
-		size_t2string(cnk1->ch_last.ps_tk_cnt)
-	);
-	if (lines_too) {
-		fprintf(Debug_File, " from lines %s/%s to %s/%s:",
-			size_t2string(cnk0->ch_first.ps_nl_cnt),
-			size_t2string(cnk1->ch_first.ps_nl_cnt),
-			size_t2string(cnk0->ch_last.ps_nl_cnt),
-			size_t2string(cnk1->ch_last.ps_nl_cnt)
-		);
-	}
-	fprintf(Debug_File, " %s %s%s\n",
-		size_t2string(run->rn_size),
-		Token_Name, (run->rn_size == 1 ? "" : "s")
-	);
-}
-
-#endif	/* DB_RUN */

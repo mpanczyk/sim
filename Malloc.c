@@ -1,6 +1,6 @@
 /*	This file is part of the checked memory manager MALLOC.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: Malloc.c,v 1.24 2017-01-24 19:46:57 Gebruiker Exp $
+	$Id: Malloc.c,v 1.26 2017-12-08 18:07:16 Gebruiker Exp $
 */
 
 #include	<stdio.h>
@@ -42,29 +42,6 @@
 
 static size_t restricted_balance = 0;	/* to simulate out-of-memory */
 
-static void
-fprintloc(FILE *out, const char *fname, int l_nmb) {
-	fprintf(out, "\"%s\", line %d: ", fname, l_nmb);
-}
-
-void
-_out_of_memory(const char *msg, const char *fname, int l_nmb, size_t size) {
-	fprintloc(stderr, fname, l_nmb);
-	fprintf(stderr, "OUT OF MEMORY");
-	if (msg) {
-		fprintf(stderr, ": %s", msg);
-	}
-	if (size != 0) {
-		fprintf(stderr, ", requested size = %s bytes",
-			any_uint2string(size, 0));
-	}
-	fprintf(stderr, "\n");
-	fflush(stderr);
-	ReportMemoryStatus(stderr);
-	exit(1);
-}
-
-
 							/* ADMINISTRATION */
 static vlong_uint total = 0;
 static vlong_uint balance = 0;
@@ -82,69 +59,8 @@ struct alloc {	/* corresponds to an allocated block */
 static struct alloc *alloc_bucket[HASH_SIZE];
 #define	alloc_bucket_for(x)	alloc_bucket[((unsigned int)(x)%HASH_SIZE)]
 
-static void
-register_alloc(char *addr, size_t size, const char *fname, int l_nmb) {
-	/* registers the allocation of a block in the administration */
-	struct alloc *new;
-	struct alloc **al_hook = &alloc_bucket_for(addr);
-
-	if (addr == 0) return;
-
-	new = my_new(struct alloc);
-	new->addr = addr;
-	new->size = size;
-	new->fname = fname;		/* no need to copy fname */
-	new->l_nmb = l_nmb;
-	new->next = *al_hook;
-	*al_hook = new;
-
-	total += size;
-	balance += size;
-	if (balance > max) {
-		max = balance;
-	}
-}
-
-
-static struct alloc **
-pointer_to_alloc_for(const char *addr) {
-	struct alloc **al_hook = &alloc_bucket_for(addr);
-
-	while (*al_hook) {
-		if ((*al_hook)->addr == addr) break;
-		al_hook = &(*al_hook)->next;
-	}
-
-	return al_hook;
-}
-
-static size_t
-register_free(char *addr) {
-	/* registers the freeing of a block */
-	struct alloc **old_p = pointer_to_alloc_for(addr);
-	struct alloc *old = *old_p;
-
-	if (old == 0) return (size_t) -1;
-	size_t old_size = old->size;
-
-	*old_p = old->next;
-	free((void *)old);
-
-	balance -= old_size;
-	return old_size;
-}
-
-void
-MemClobber(void *p, size_t size) {
-	unsigned char *s = (unsigned char *)p;
-	size_t i;
-
-	for (i = 0; i < size; i++) {
-		s[i] = 0125;		/* 0101 0101 */
-	}
-}
-
 							/* MEMORY STATUS */
+
 struct call {	/* summarizes all the allocations at a call in the program */
 	struct call *next;
 	const char *fname;
@@ -219,6 +135,11 @@ number_of_calls(const struct call *cl) {
 }
 
 static void
+fprintloc(FILE *out, const char *fname, int l_nmb) {
+	fprintf(out, "\"%s\", line %d: ", fname, l_nmb);
+}
+
+static void
 report_actual_call(FILE *out, const struct call *cl) {
 	fprintloc(out, cl->fname, cl->l_nmb);
 	fprintf(out, "still allocated: %d block%s of size ",
@@ -276,7 +197,58 @@ ReportMemoryStatus(FILE *out) {
 	fflush(out);
 }
 
+void	/* used in external macros */
+_out_of_memory(const char *msg, const char *fname, int l_nmb, size_t size) {
+	fprintloc(stderr, fname, l_nmb);
+	fprintf(stderr, "OUT OF MEMORY");
+	if (msg) {
+		fprintf(stderr, ": %s", msg);
+	}
+	if (size != 0) {
+		fprintf(stderr, ", requested size = %s bytes",
+			any_uint2string(size, 0));
+	}
+	fprintf(stderr, "\n");
+	fflush(stderr);
+	ReportMemoryStatus(stderr);
+	exit(1);
+}
+
 							/* MALLOC */
+
+static void
+register_alloc(char *addr, size_t size, const char *fname, int l_nmb) {
+	/* registers the allocation of a block in the administration */
+	struct alloc *new;
+	struct alloc **al_hook = &alloc_bucket_for(addr);
+
+	if (addr == 0) return;
+
+	new = my_new(struct alloc);
+	new->addr = addr;
+	new->size = size;
+	new->fname = fname;		/* no need to copy fname */
+	new->l_nmb = l_nmb;
+	new->next = *al_hook;
+	*al_hook = new;
+
+	total += size;
+	balance += size;
+	if (balance > max) {
+		max = balance;
+	}
+}
+
+void
+MemClobber(void *p, size_t size) {
+	unsigned char *s = (unsigned char *)p;
+	size_t i;
+
+	for (i = 0; i < size; i++) {
+		s[i] = 0125;		/* 0101 0101 */
+	}
+}
+
 void *
 _mreg_malloc(int chk, size_t size, const char *fname, int l_nmb) {
 	void *res;
@@ -304,6 +276,14 @@ _mreg_malloc(int chk, size_t size, const char *fname, int l_nmb) {
 	return res;
 }
 
+char *
+_new_string(int chk, const char *s, const char *fname, int l_nmb) {
+	return strcpy((char *)(_mreg_malloc(chk, strlen(s)+1, fname, l_nmb)),
+		      s);
+}
+
+							/* CALLOC */
+
 void *
 _mreg_calloc(int chk, size_t n, size_t size, const char *fname, int l_nmb) {
 	void *res;
@@ -325,6 +305,36 @@ _mreg_calloc(int chk, size_t n, size_t size, const char *fname, int l_nmb) {
 	register_alloc(res, n*size, fname, l_nmb);
 
 	return res;
+}
+
+							/* REALLOC */
+
+static struct alloc **
+pointer_to_alloc_for(const char *addr) {
+	struct alloc **al_hook = &alloc_bucket_for(addr);
+
+	while (*al_hook) {
+		if ((*al_hook)->addr == addr) break;
+		al_hook = &(*al_hook)->next;
+	}
+
+	return al_hook;
+}
+
+static size_t
+register_free(char *addr) {
+	/* registers the freeing of a block */
+	struct alloc **old_p = pointer_to_alloc_for(addr);
+	struct alloc *old = *old_p;
+
+	if (old == 0) return (size_t) -1;
+	size_t old_size = old->size;
+
+	*old_p = old->next;
+	free((void *)old);
+
+	balance -= old_size;
+	return old_size;
 }
 
 void *
@@ -368,6 +378,8 @@ _mreg_realloc(int chk, void *addr, size_t size, const char *fname, int l_nmb) {
 	return res;
 }
 
+							/* FREE */
+
 /* ARGSUSED */
 void
 _mreg_free(void *addr, const char *fname, int l_nmb) {
@@ -388,12 +400,6 @@ _mreg_free(void *addr, const char *fname, int l_nmb) {
 	free(addr);
 }
 
-char *
-_new_string(int chk, const char *s, const char *fname, int l_nmb) {
-	return strcpy((char *)(_mreg_malloc(chk, strlen(s)+1, fname, l_nmb)),
-		      s);
-}
-
 /* End library module source code */
 #endif	/* _MALLOC_CODE_ */
 
@@ -403,6 +409,7 @@ satisfy_lint(void *x) {
 	void *v;
 
 	v = _mreg_malloc(0, 0, 0, 0);
+	v = _new_string(0, 0, 0, 0);
 	v = _mreg_calloc(0, 0, 0, 0, 0);
 	v = _mreg_realloc(0, 0, 0, 0, 0);
 	_mreg_free(x, 0, 0);
@@ -411,7 +418,6 @@ satisfy_lint(void *x) {
 	ReportMemoryStatus(0);
 	MemClobber(v, 0);
 
-	v = _new_string(0, 0, 0, 0);
 	satisfy_lint(v);
 }
 #endif	/* lint */

@@ -1,6 +1,6 @@
 /*	This file is part of the software similarity tester SIM.
 	Written by Dick Grune, Vrije Universiteit, Amsterdam.
-	$Id: hash.c,v 2.39 2017-02-04 16:58:54 dick Exp $
+	$Id: hash.c,v 2.44 2017-12-03 09:55:23 dick Exp $
 */
 
 /*	Text is compared by comparing every substring to all substrings
@@ -42,7 +42,7 @@
 #include	"Malloc.h"
 #include	"any_int.h"
 #include	"token.h"
-#include	"language.h"
+#include	"properties.h"
 #include	"token.h"
 #include	"tokenarray.h"
 #include	"options.h"
@@ -56,46 +56,13 @@ static void make_forward_references_using_hash(void);
 static void make_forward_references_perfect(void);
 static void make_chains_circular(void);
 
-#ifdef	DB_FORW_REF
-static void db_forward_reference_check(const char *);
-static void db_print_forward_references(void);
-#endif	/* DB_FORW_REF */
-
-void
-Make_Forward_References(void) {
-	/*	Constructs the forward references table.
-	*/
-	n_forward_references = Token_Array_Length();
-	forward_reference =
-		(size_t *)Calloc(n_forward_references, sizeof (size_t));
-	make_forward_references_using_hash();
-	make_forward_references_perfect();
-	if (is_set_option('a')) {
-		make_chains_circular();
-	}
-#ifdef	DB_FORW_REF_PRINT
-	db_print_forward_references();
-#endif	/* DB_FORW_REF_PRINT */
-}
-
-size_t
-Forward_Reference(size_t i, size_t i0) {
-	if (i == 0 || i >= n_forward_references) {
-		fatal("internal error, bad forward reference");
-	}
-	size_t new_i = forward_reference[i];
-	size_t res = new_i == 0 || new_i == i0 /*circular*/ ? 0 : new_i;
-	return res;
-}
-
-void
-Free_Forward_References(void) {
-	Free(forward_reference);
-}
-
 							/* HASHING */
 static size_t *latest_index;
 static size_t latest_index_table_size;
+
+#ifdef	DB_FORW_REF
+#include	"hash_db.i"
+#endif	/* DB_FORW_REF */
 
 /* The prime numbers of the form 4 * i + 3 for some i, all greater
    than twice the previous one and smaller than 2^40 (for now).
@@ -191,17 +158,21 @@ make_forward_references_using_hash(void) {
 			if (	/* we have a complete hash value */
 				j - txt->tx_start >= Min_Run_Size
 			) {	/* remove the oldest token */
-				Token oldest_token =
-					Token_Array[j - Min_Run_Size];
+				/* this should be a routine,
+				   but it is too active code for that */
+				int oldest_value =
+				    Token2int(Token_Array[j - Min_Run_Size]);
 				int oldest_shift =
-					((Min_Run_Size-1) * SHIFT) % 32;
+				    ((Min_Run_Size-1) * SHIFT) % 32;
 				hash ^=
-				   Left_Circular_32(oldest_token, oldest_shift);
+				    Left_Circular_32(
+				        oldest_value, oldest_shift
+				    );
 			}
 			/* Circular left shift */
 			hash = Left_Circular_32(hash, SHIFT);
 			/* Add new token */
-			hash ^= Token_Array[j];
+			hash ^= Token2int(Token_Array[j]);
 
 			/* If have we assembled a complete hash value now,
 			   the corresponding run would start at
@@ -281,7 +252,7 @@ make_forward_references_perfect(void) {
 	size_t i;
 
 	/* Simulate a perfect hash by doing a full comparison
-	   over Min_Run_Size, for gathering statistics.
+	   over Min_Run_Size.
 	*/
 
 	for (i = 0; i+Min_Run_Size < Token_Array_Length(); i++) {
@@ -304,131 +275,34 @@ make_forward_references_perfect(void) {
 #endif	/* DB_FORW_REF */
 }
 
-#ifdef	DB_FORW_REF
-
-static void
-db_print_forward_references(void) {
-	/* also determines the lengths of the chains, for statistics */
-	size_t n;
-	size_t n_frw_chains = 0;
-	size_t tot_frwc_len = 0;
-	size_t *print_loc_of =
-		(size_t *)Calloc(Token_Array_Length(), sizeof (size_t));
-	size_t *number_of_chains_of_length =
-		(size_t *)Calloc(Token_Array_Length(), sizeof (size_t));
-
-	/* print the references */
-	for (n = 1; n < Token_Array_Length(); n++) {
-		size_t fw = forward_reference[n];
-		if (fw == 0) continue;
-
-		/* we have a chain */
-		fprintf(Debug_File, "FWR[%s]:", any_uint2string(n, 0));
-
-		/* is it old? */
-		if (print_loc_of[n]) {
-			fprintf(Debug_File, " see %s\n",
-				any_uint2string(print_loc_of[n], 0));
-			continue;
-		}
-
-		/* no, we have the beginning of a new chain */
-		size_t count = 0;
-		do {
-			count++;
-			fprintf(Debug_File, " %s",
-				any_uint2string(fw, 0));
-			print_loc_of[fw] = n;
-			fw = forward_reference[fw];
-		} while(fw && fw != n);	/* continuing and not circular */
-		if (fw) {	/* circular */
-			fprintf(Debug_File, " C");
-			count++;
-		}
-		n_frw_chains++;
-		tot_frwc_len += count;
-		number_of_chains_of_length[count]++;
-		fprintf(Debug_File, "\n");
-	}
-
-	/* print the chain lengths */
-	for (n = 1; n < Token_Array_Length(); n++) {
-		if (number_of_chains_of_length[n]) {
-			fprintf(Debug_File, "length[%d]:\t%d\n",
-				n, number_of_chains_of_length[n]);
-		}
-	}
-
-	fprintf(Debug_File,
-		"text length = %s, # forward chains = %s, av. frw chain length = %.2f\n\n",
-		any_uint2string(Token_Array_Length(), 0),
-		any_uint2string(n_frw_chains, 0),
-		(n_frw_chains ? 1.0 * tot_frwc_len / n_frw_chains : 0.0)
-	);
-
-	Free(number_of_chains_of_length);
-	Free(print_loc_of);
-}
-
-static void
-db_frw_chain(size_t n, char *crossed_out) {
-	if (forward_reference[n] == 0) {
-		fprintf(Debug_File,
-			">>>> db_frw_chain() forward_reference[n] == 0 <<<<\n"
-		);
-		return;
-	}
-
-	size_t n_entries = 0;
-	size_t fw;
-
-	for (fw = n; fw; fw = forward_reference[fw]) {
-		if (crossed_out[fw]) {
-			fprintf(Debug_File,
-				">>>> error: forward references cross <<<<\n"
-			);
-		}
-		n_entries++;
-		crossed_out[fw] = 1;
-	}
-#ifdef	DB_FORW_REF_PRINT
-	fprintf(Debug_File, "chain_start = %s, n_entries = %s\n",
-		any_uint2string(n, 0), any_uint2string(n_entries, 0));
-#endif	/* DB_FORW_REF_PRINT */
-}
-
-static void
-db_forward_reference_check(const char *msg) {
-	/*	Each forward_reference[n] starts in principle a new
-		chain, and these chains never touch each other.
-		We check this property by marking the positions in each
-		chain in an array; if we meet a marked entry while
-		following a chain, it must have been on an earlier chain
-		and we have an error.
+void
+Make_Forward_References(void) {
+	/*	Constructs the forward references table.
 	*/
-	size_t n;
-	char *crossed_out = (char *)Calloc(Token_Array_Length(), sizeof (char));
-
-	fprintf(Debug_File, "\n\n**** DB_FORWARD_REFERENCES, %s ****\n", msg);
-	fprintf(Debug_File, "latest_index_table_size = %s\n",
-		any_uint2string(latest_index_table_size, 0));
-
-	if (forward_reference[0]) {
-		fprintf(Debug_File,
-			">>>> forward_reference[0] is not zero <<<<\n"
-		);
-	}
-	for (n = 1; n < Token_Array_Length(); n++) {
-		if (forward_reference[n] && !crossed_out[n]) {
-			/* start of a new chain */
-			db_frw_chain(n, crossed_out);
-		}
+	n_forward_references = Token_Array_Length();
+	forward_reference =
+		(size_t *)Calloc(n_forward_references, sizeof (size_t));
+	make_forward_references_using_hash();
+	make_forward_references_perfect();
+	if (is_set_option('a')) {
+		make_chains_circular();
 	}
 #ifdef	DB_FORW_REF_PRINT
 	db_print_forward_references();
 #endif	/* DB_FORW_REF_PRINT */
-
-	Free(crossed_out);
 }
 
-#endif	/* DB_FORW_REF */
+size_t
+Forward_Reference(size_t i, size_t i0) {
+	if (i == 0 || i >= n_forward_references) {
+		fatal("internal error, bad forward reference");
+	}
+	size_t new_i = forward_reference[i];
+	size_t res = new_i == 0 || new_i == i0 /*circular*/ ? 0 : new_i;
+	return res;
+}
+
+void
+Free_Forward_References(void) {
+	Free(forward_reference);
+}
